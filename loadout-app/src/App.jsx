@@ -1658,6 +1658,16 @@ function ProfileScreen({ name, isMe, myAchievementIds, myStats, onBack }) {
 /* ---------------------------------------------------------------------- */
 /* LEADERBOARD                                                             */
 /* ---------------------------------------------------------------------- */
+function formatMetric(metric, entry) {
+  switch (metric) {
+    case "volume30d": return `${Math.round(entry.volume30d || 0).toLocaleString()} lb`;
+    case "streak": return `${entry.streak || 0}d`;
+    case "achievements": return `${entry.achievementCount || 0}`;
+    case "prs": return `${entry.prsCount || 0}`;
+    default: return "";
+  }
+}
+
 function Leaderboard({ myName, refreshKey, onOpenProfile }) {
   const [entries, setEntries] = useState(null);
   const [metric, setMetric] = useState("volume30d");
@@ -1667,7 +1677,10 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
     (async () => {
       try {
         const profiles = await getAllProfiles();
-        if (!cancelled) setEntries(profiles.map((p) => ({ name: p.name, volume30d: p.volume_30d, streak: p.streak })));
+        if (!cancelled) setEntries(profiles.map((p) => ({
+          name: p.name, volume30d: p.volume_30d, streak: p.streak,
+          achievementCount: p.achievement_count, prsCount: p.prs_count,
+        })));
       } catch {
         if (!cancelled) setEntries([]);
       }
@@ -1677,7 +1690,8 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
 
   if (entries === null) return <div style={{ padding: 24, color: T.chalkDim }}>Loading leaderboard…</div>;
 
-  const sorted = [...entries].sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+  const metricKey = { volume30d: "volume30d", streak: "streak", achievements: "achievementCount", prs: "prsCount" }[metric];
+  const sorted = [...entries].sort((a, b) => (b[metricKey] || 0) - (a[metricKey] || 0));
   const top3 = sorted.slice(0, 3);
   const rest = sorted.slice(3);
   const medalColor = [T.brass, "#C9CDD3", "#B9764F"];
@@ -1685,9 +1699,11 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
   return (
     <div style={{ padding: "24px 18px 100px" }}>
       <h1 style={TITLE}>Leaderboard</h1>
-      <div style={{ display: "flex", gap: 8, margin: "14px 0 22px" }}>
+      <div style={{ display: "flex", gap: 8, margin: "14px 0 22px", flexWrap: "wrap" }}>
         <ToggleBtn active={metric === "volume30d"} onClick={() => setMetric("volume30d")}>Volume</ToggleBtn>
         <ToggleBtn active={metric === "streak"} onClick={() => setMetric("streak")}>Streak</ToggleBtn>
+        <ToggleBtn active={metric === "achievements"} onClick={() => setMetric("achievements")}>Achievements</ToggleBtn>
+        <ToggleBtn active={metric === "prs"} onClick={() => setMetric("prs")}>PRs Set</ToggleBtn>
       </div>
 
       {sorted.length === 0 && (
@@ -1710,7 +1726,7 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
                 </div>
                 <PlateStack filled={rank === 0 ? 4 : rank === 1 ? 3 : 2} total={4} color={medalColor[rank]} size={rank === 0 ? 26 : 20} />
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 11.5 }}>
-                  {metric === "volume30d" ? `${Math.round(entry.volume30d || 0).toLocaleString()} lb` : `${entry.streak || 0}d`}
+                  {formatMetric(metric, entry)}
                 </div>
               </button>
             ) : <div key={i} />;
@@ -1728,7 +1744,7 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
             <div style={{ width: 22, fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 13 }}>{i + 4}</div>
             <div style={{ flex: 1, fontSize: 14, color: T.chalk }}>{entry.name}</div>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 13 }}>
-              {metric === "volume30d" ? `${Math.round(entry.volume30d || 0).toLocaleString()} lb` : `${entry.streak || 0}d`}
+              {formatMetric(metric, entry)}
             </div>
           </button>
         ))}
@@ -2192,6 +2208,7 @@ export default function Loadout() {
         currentStreak: fullStats.currentStreak,
         volume30: fullStats.volume30 ?? stats.volume30,
         achievementIds: ids,
+        prsCount: fullStats.distinctPRExercises,
       });
     })();
     return () => { cancelled = true; };
@@ -2246,7 +2263,7 @@ export default function Loadout() {
     setPrs(newPrs);
 
     const s = computeStats(newWorkouts);
-    await updatePublicSnapshot(session.user.id, { currentStreak: s.streak, volume30: s.volume30, achievementIds });
+    await updatePublicSnapshot(session.user.id, { currentStreak: s.streak, volume30: s.volume30, achievementIds, prsCount: Object.keys(newPrs).length });
     setLbRefresh((x) => x + 1);
     setJustFinished({ volume: result.volume, durationSeconds: result.durationSeconds, gotPR });
     setActiveDayIdx(null);
