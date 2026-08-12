@@ -1535,9 +1535,14 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
     }
   };
 
-  const handleDelete = async (id) => {
-    await deleteChatMessage(id);
-    setMessages(await getChatMessages());
+  const handleDelete = async (id, mine) => {
+    if (!window.confirm(mine ? "Delete your message?" : "Delete this message? (admin)")) return;
+    try {
+      await deleteChatMessage(id);
+      setMessages(await getChatMessages());
+    } catch (e) {
+      alert(`Couldn't delete that message: ${e.message || "unknown error"}`);
+    }
   };
 
   return (
@@ -1545,7 +1550,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
       <h1 style={{ ...TITLE, marginBottom: 4 }}>The Gym Floor</h1>
       <div style={{ color: T.chalkDim, fontSize: 13, marginBottom: 14 }}>One room. Everyone training right now.</div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", paddingBottom: 12, minHeight: 200 }}>
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 12, minHeight: 0 }}>
         {messages === null && <div style={{ color: T.chalkDim, padding: 20 }}>Loading chat…</div>}
         {messages && messages.length === 0 && (
           <div style={{ color: T.chalkDim, padding: "20px 0", textAlign: "center" }}>No messages yet. Say hey to the first person to see this.</div>
@@ -1587,7 +1592,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   </button>
                   {canDelete && (
                     <button
-                      onClick={() => handleDelete(m.id)}
+                      onClick={() => handleDelete(m.id, mine)}
                       title={mine ? "Delete your message" : "Delete message (admin)"}
                       style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, display: "flex" }}
                     >
