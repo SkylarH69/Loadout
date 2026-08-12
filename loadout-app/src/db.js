@@ -25,12 +25,13 @@ export async function createProfile(userId, name) {
   if (error) throw error;
 }
 
-export async function updatePublicSnapshot(userId, { currentStreak, volume30, achievementIds }) {
+export async function updatePublicSnapshot(userId, { currentStreak, volume30, achievementIds, prsCount }) {
   await supabase.from("profiles").update({
     streak: currentStreak,
     volume_30d: volume30,
     achievement_ids: achievementIds,
     achievement_count: achievementIds.length,
+    prs_count: prsCount || 0,
   }).eq("id", userId);
 }
 
