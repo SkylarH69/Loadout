@@ -2017,16 +2017,21 @@ export default function Loadout() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Once logged in, load (or discover we need to create) the profile row + all training data
+  // Once logged in, load (or discover we need to create) the profile row + all training data.
+  // This can re-fire when Supabase silently refreshes the auth token on tab focus — that's
+  // normal and harmless, but we must NOT flip checkingProfile in that case, since that flag
+  // gates a full-screen loading state that unmounts everything currently on screen, including
+  // an in-progress workout. Only show that loading state on a genuine first load.
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setCheckingProfile(true);
+    const isFirstLoad = !profileRow;
+    if (isFirstLoad) setCheckingProfile(true);
     (async () => {
       const row = await getProfile(session.user.id);
       if (cancelled) return;
       setProfileRow(row);
-      setCheckingProfile(false);
+      if (isFirstLoad) setCheckingProfile(false);
       if (!row) return; // ChooseName screen will handle profile creation
 
       const [prog, w, pr, activity] = await Promise.all([
