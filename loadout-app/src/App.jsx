@@ -1419,15 +1419,17 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         return (
           <div key={ex.name + exIdx} style={{ ...CARD, marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</span>
                 <button
                   onClick={() => setSwapExerciseFor(isSwappingEx ? null : exIdx)}
                   title="Swap this exercise"
-                  style={{ background: "none", border: "none", cursor: "pointer", color: isSwappingEx ? T.rust : T.chalkDim, display: "flex", alignItems: "center" }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: isSwappingEx ? T.rust : T.chalkDim, display: "flex", alignItems: "center", flexShrink: 0 }}
                 >
-                  <Repeat size={15} />
+                  <Repeat size={14} />
                 </button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                 <button
                   onClick={() => setNoteOpenFor(noteOpen ? null : exIdx)}
                   title="Private note"
