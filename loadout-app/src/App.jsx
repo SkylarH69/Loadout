@@ -1108,7 +1108,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
     if (phase !== "log") return;
     try {
       localStorage.setItem(draftKey(userId), JSON.stringify({
-        dayIndex, dayName: day.name, startTime: startTimeRef.current, log,
+        dayIndex, dayName: day.name, startTime: startTimeRef.current, log, savedAt: Date.now(),
       }));
     } catch { /* storage unavailable, degrade silently — nothing else we can do here */ }
   }, [log, phase, dayIndex, day.name, userId]);
@@ -1122,7 +1122,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
     const syncNow = () => {
       try {
         localStorage.setItem(draftKey(userId), JSON.stringify({
-          dayIndex, dayName: day.name, startTime: startTimeRef.current, log,
+          dayIndex, dayName: day.name, startTime: startTimeRef.current, log, savedAt: Date.now(),
         }));
       } catch { /* ignore */ }
       setActiveDraft(userId, { dayIndex, dayName: day.name, startTime: startTimeRef.current, log }).catch(() => {});
@@ -2030,21 +2030,31 @@ export default function Loadout() {
       setCommunityActivity(activity);
 
       // Resume an in-progress workout if one was left running when the app closed.
-      // Server-side draft is checked first — it survives cache clears, stale home-screen
-      // icons, or switching devices, in a way local storage alone can't.
+      // Server-side draft is checked as one source, local storage as another —
+      // whichever was actually saved more recently wins. A server draft from an
+      // earlier confirmed set should NOT override newer edits sitting locally
+      // that haven't synced yet.
       // Guarded so it only runs once per login — this effect can otherwise fire
       // a second time right after setProfileRow above updates profileRow?.id.
       if (!resumeCheckedRef.current) {
         resumeCheckedRef.current = true;
         try {
-          let draft = null;
+          let serverDraft = null;
           try {
-            draft = await getActiveDraft(session.user.id);
-          } catch { /* server draft unavailable, fall back to local */ }
-          if (!draft) {
+            serverDraft = await getActiveDraft(session.user.id);
+          } catch { /* server draft unavailable, local storage will be used instead */ }
+
+          let localDraft = null;
+          try {
             const raw = localStorage.getItem(draftKey(session.user.id));
-            if (raw) draft = JSON.parse(raw);
-          }
+            if (raw) localDraft = JSON.parse(raw);
+          } catch { /* corrupted local draft, ignore */ }
+
+          const draft =
+            serverDraft && localDraft
+              ? (localDraft.savedAt || 0) > (serverDraft.savedAt || 0) ? localDraft : serverDraft
+              : serverDraft || localDraft;
+
           if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex] && draft.log) {
             setResumeDraft(draft);
             setActiveDayIdx(draft.dayIndex);
