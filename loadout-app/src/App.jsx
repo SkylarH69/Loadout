@@ -3,7 +3,7 @@ import {
   Dumbbell, Flame, Trophy, MessageCircle, Home, Plus, ChevronRight,
   ChevronLeft, Check, X, TrendingUp, Award, Send, Medal, Pencil,
   ArrowLeft, MessageSquare, Layers, Heart, Users, ShieldCheck, ExternalLink,
-  Search, Sparkles, Trash2, Minus, Clock, StickyNote
+  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
@@ -338,6 +338,7 @@ function ensureIds(days) {
 function Customizer({ sourceProgram, initialDays, onCancel, onSave }) {
   const [days, setDays] = useState(() => ensureIds(initialDays || sourceProgram.days));
   const [pickerFor, setPickerFor] = useState(null);
+  const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
 
   const updateExercise = (dayId, exId, field, value) => {
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
@@ -400,35 +401,55 @@ function Customizer({ sourceProgram, initialDays, onCancel, onSave }) {
             }}
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {day.exercises.map((ex) => (
-              <div key={ex.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  value={ex.name}
-                  onChange={(e) => updateExercise(day.id, ex.id, "name", e.target.value)}
-                  style={{ ...INPUT, flex: 1, padding: "10px 12px", fontSize: 13.5 }}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                    <ChevronLeft size={13} />
-                  </button>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
-                    {ex.sets}
-                  </span>
-                  <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                    <ChevronRight size={13} />
-                  </button>
+            {day.exercises.map((ex) => {
+              const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
+              return (
+                <div key={ex.id}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <input
+                      value={ex.name}
+                      onChange={(e) => updateExercise(day.id, ex.id, "name", e.target.value)}
+                      style={{ ...INPUT, flex: 1, padding: "10px 12px", fontSize: 13.5 }}
+                    />
+                    <button
+                      onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
+                      title="Replace this exercise"
+                      style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      <Repeat size={16} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+                        <ChevronLeft size={13} />
+                      </button>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+                        {ex.sets}
+                      </span>
+                      <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                    <input
+                      value={ex.reps}
+                      onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
+                      placeholder="reps"
+                      style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
+                    />
+                    <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {isSwapping && (
+                    <ExercisePicker
+                      onAdd={(name) => { updateExercise(day.id, ex.id, "name", name); setSwapFor(null); }}
+                      onClose={() => setSwapFor(null)}
+                    />
+                  )}
                 </div>
-                <input
-                  value={ex.reps}
-                  onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
-                  placeholder="reps"
-                  style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
-                />
-                <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", flexShrink: 0 }}>
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {pickerFor === day.id ? (
@@ -460,6 +481,7 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
     initialDays && initialDays.length ? ensureIds(initialDays) : [{ id: nextId(), name: "Day 1", exercises: [] }]
   );
   const [pickerFor, setPickerFor] = useState(null);
+  const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
 
   const addDay = () => {
     setDays((prev) => [...prev, { id: nextId(), name: `Day ${prev.length + 1}`, exercises: [] }]);
@@ -574,33 +596,53 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
           )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {day.exercises.map((ex) => (
-              <div key={ex.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 10, border: `1.5px solid ${T.line}` }}>
-                  {ex.name}
+            {day.exercises.map((ex) => {
+              const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
+              return (
+                <div key={ex.id}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 10, border: `1.5px solid ${T.line}` }}>
+                      {ex.name}
+                    </div>
+                    <button
+                      onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
+                      title="Replace this exercise"
+                      style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+                    >
+                      <Repeat size={16} />
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+                        <ChevronLeft size={13} />
+                      </button>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+                        {ex.sets}
+                      </span>
+                      <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                    <input
+                      value={ex.reps}
+                      onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
+                      placeholder="reps"
+                      style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
+                    />
+                    <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {isSwapping && (
+                    <ExercisePicker
+                      onAdd={(exName) => { updateExercise(day.id, ex.id, "name", exName); setSwapFor(null); }}
+                      onClose={() => setSwapFor(null)}
+                    />
+                  )}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                    <ChevronLeft size={13} />
-                  </button>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
-                    {ex.sets}
-                  </span>
-                  <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                    <ChevronRight size={13} />
-                  </button>
-                </div>
-                <input
-                  value={ex.reps}
-                  onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
-                  placeholder="reps"
-                  style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
-                />
-                <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", flexShrink: 0 }}>
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {pickerFor === day.id ? (
