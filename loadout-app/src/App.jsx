@@ -29,8 +29,8 @@ const ABOUT = {
   eyebrow: "Veteran-founded",
   mission:
     "Loadout started with a simple idea: the gym is one of the few places where rank doesn't matter and nobody trains alone. We built this to bring that same accountability online — real programs, honest tracking, and a floor full of people who show up.",
- founderNote:
-    "I built this because fitness has always been about more than the workout itself. After serving and spending years in the gym, I wanted a place that brings together the progress, the people, and the culture that make training worth coming back to.",
+  founderNote:
+    "I served, then I lifted, then I got tired of tracking apps that treat training like a spreadsheet instead of a community. This is built by someone who's been in both rooms.",
 };
 
 const VALUE_PILLARS = [
@@ -198,7 +198,7 @@ function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }
 /* ---------------------------------------------------------------------- */
 /* PROGRAM DETAIL + COMMENTS                                               */
 /* ---------------------------------------------------------------------- */
-function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive }) {
+function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onActivityChange }) {
   const [comments, setComments] = useState(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -226,6 +226,7 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive }) {
       const activity = await getCommunityActivity(myUserId);
       activity.programCommentCount = (activity.programCommentCount || 0) + 1;
       await setCommunityActivity(myUserId, activity);
+      onActivityChange && onActivityChange();
     } finally {
       setSending(false);
     }
@@ -627,7 +628,7 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
 /* ---------------------------------------------------------------------- */
 /* PROGRAMS TAB (library / detail / customize / my plan)                   */
 /* ---------------------------------------------------------------------- */
-function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId }) {
+function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange }) {
   const [view, setView] = useState(profile ? "mine" : "library");
   const [detailId, setDetailId] = useState(null);
   const [customizeProgram, setCustomizeProgram] = useState(null);
@@ -727,6 +728,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId 
         myName={myName}
         myUserId={myUserId}
         isActive={profile && profile.program.sourceId === detailProgram.id}
+        onActivityChange={onActivityChange}
       />
     );
   }
@@ -1333,7 +1335,7 @@ function ToggleBtn({ active, onClick, children }) {
 /* ---------------------------------------------------------------------- */
 /* COMMUNITY CHAT — THE GYM FLOOR                                          */
 /* ---------------------------------------------------------------------- */
-function Chat({ myName, myUserId, streak, achievementCount, isTop, onOpenProfile }) {
+function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOpenProfile, onActivityChange }) {
   const [messages, setMessages] = useState(null);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef(null);
@@ -1365,9 +1367,15 @@ function Chat({ myName, myUserId, streak, achievementCount, isTop, onOpenProfile
       const activity = await getCommunityActivity(myUserId);
       activity.chatCount = (activity.chatCount || 0) + 1;
       await setCommunityActivity(myUserId, activity);
+      onActivityChange && onActivityChange();
     } finally {
       setSending(false);
     }
+  };
+
+  const handleDelete = async (id) => {
+    await deleteChatMessage(id);
+    setMessages(await getChatMessages());
   };
 
   return (
@@ -1380,37 +1388,51 @@ function Chat({ myName, myUserId, streak, achievementCount, isTop, onOpenProfile
         {messages && messages.length === 0 && (
           <div style={{ color: T.chalkDim, padding: "20px 0", textAlign: "center" }}>No messages yet. Say hey to the first person to see this.</div>
         )}
-        {messages && messages.map((m, i) => {
-          const mine = m.name === myName;
+        {messages && messages.map((m) => {
+          const mine = m.userId === myUserId;
+          const canDelete = mine || isAdmin;
           return (
-            <div key={i} style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 12 }}>
+            <div key={m.id} style={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", marginBottom: 12 }}>
               <div style={{ maxWidth: "82%" }}>
-                <button
-                  onClick={() => onOpenProfile && onOpenProfile(m.name)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
-                    marginLeft: mine ? 0 : 4, marginRight: mine ? 4 : 0,
-                    justifyContent: mine ? "flex-end" : "flex-start", width: "100%",
-                    background: "none", border: "none", cursor: onOpenProfile ? "pointer" : "default", padding: 0,
-                  }}
-                >
-                  {m.isTop && <Trophy size={12} color={T.brass} />}
-                  <span style={{ fontSize: 11.5, color: mine ? T.chalkDim : T.chalk, fontWeight: 600 }}>{m.name}</span>
-                  {typeof m.streak === "number" && m.streak > 0 && (
-                    <span style={{ display: "flex", alignItems: "center", gap: 2, color: T.rust, fontSize: 11 }}>
-                      <Flame size={11} /> {m.streak}
-                    </span>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
+                  marginLeft: mine ? 0 : 4, marginRight: mine ? 4 : 0,
+                  justifyContent: mine ? "flex-end" : "flex-start",
+                }}>
+                  <button
+                    onClick={() => onOpenProfile && onOpenProfile(m.name)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: "none", border: "none", cursor: onOpenProfile ? "pointer" : "default", padding: 0,
+                    }}
+                  >
+                    {m.isTop && <Trophy size={12} color={T.brass} />}
+                    <span style={{ fontSize: 11.5, color: mine ? T.chalkDim : T.chalk, fontWeight: 600 }}>{m.name}</span>
+                    {typeof m.streak === "number" && m.streak > 0 && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 2, color: T.rust, fontSize: 11 }}>
+                        <Flame size={11} /> {m.streak}
+                      </span>
+                    )}
+                    {typeof m.achievementCount === "number" && m.achievementCount > 0 && (
+                      <span style={{
+                        display: "flex", alignItems: "center", gap: 2, fontSize: 10.5, color: T.brass,
+                        border: `1px solid ${T.brass}`, borderRadius: 10, padding: "1px 6px",
+                      }}>
+                        <Award size={10} /> {m.achievementCount}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 10.5, color: T.chalkDim }}>· {formatRelativeTime(m.ts)}</span>
+                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      title={mine ? "Delete your message" : "Delete message (admin)"}
+                      style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, display: "flex" }}
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   )}
-                  {typeof m.achievementCount === "number" && m.achievementCount > 0 && (
-                    <span style={{
-                      display: "flex", alignItems: "center", gap: 2, fontSize: 10.5, color: T.brass,
-                      border: `1px solid ${T.brass}`, borderRadius: 10, padding: "1px 6px",
-                    }}>
-                      <Award size={10} /> {m.achievementCount}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 10.5, color: T.chalkDim }}>· {formatRelativeTime(m.ts)}</span>
-                </button>
+                </div>
                 <div style={{
                   background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 14,
                   borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
@@ -1584,6 +1606,49 @@ function FinishBanner({ data, onClose }) {
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/* ACHIEVEMENT TOAST — the dopamine hit                                    */
+/* ---------------------------------------------------------------------- */
+function AchievementToast({ achievement, onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 4200);
+    return () => clearTimeout(timer);
+  }, [achievement, onDismiss]);
+
+  if (!achievement) return null;
+  const Icon = ACHIEVEMENT_ICONS[achievement.icon] || Award;
+  const color = TIER_COLOR[achievement.tier] || T.brass;
+
+  return (
+    <div
+      onClick={onDismiss}
+      style={{
+        position: "absolute", top: 16, left: 16, right: 16, zIndex: 50,
+        display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+        background: T.iron2, border: `1.5px solid ${color}`, borderRadius: 14,
+        padding: "12px 14px", boxShadow: `0 0 24px ${color}55, 0 8px 20px rgba(0,0,0,0.4)`,
+        animation: "toastDrop .4s cubic-bezier(.2,1.4,.4,1)",
+      }}
+    >
+      <div style={{
+        width: 42, height: 42, borderRadius: "50%", flexShrink: 0, background: color,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Icon size={20} color={T.iron} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, color, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600 }}>
+          Achievement Unlocked
+        </div>
+        <div style={{ fontSize: 14.5, color: T.chalk, fontFamily: "'Oswald', sans-serif", textTransform: "uppercase", letterSpacing: 0.3 }}>
+          {achievement.name}
+        </div>
+      </div>
+      <Sparkles size={16} color={color} style={{ flexShrink: 0 }} />
+    </div>
+  );
+}
+
 export default function Loadout() {
   const [session, setSession] = useState(undefined); // undefined = checking, null = logged out
   const [profileRow, setProfileRow] = useState(null); // row from `profiles` table (null until loaded/created)
@@ -1599,6 +1664,8 @@ export default function Loadout() {
   const [achievementIds, setAchievementIds] = useState([]);
   const [achievementStats, setAchievementStats] = useState(null);
   const [viewingProfile, setViewingProfile] = useState(null);
+  const [toastQueue, setToastQueue] = useState([]);
+  const prevAchievementIdsRef = useRef(null); // null = not computed yet (skip celebrating on first load)
 
   // Track auth session
   useEffect(() => {
@@ -1645,6 +1712,16 @@ export default function Loadout() {
       const fullStats = await buildAchievementStats(compatProfile, workouts, prs, communityActivity);
       const ids = ACHIEVEMENTS.filter((a) => a.check(fullStats)).map((a) => a.id);
       if (cancelled) return;
+
+      if (prevAchievementIdsRef.current !== null) {
+        const newlyUnlocked = ids.filter((id) => !prevAchievementIdsRef.current.includes(id));
+        if (newlyUnlocked.length > 0) {
+          const newAchievements = ACHIEVEMENTS.filter((a) => newlyUnlocked.includes(a.id));
+          setToastQueue((q) => [...q, ...newAchievements]);
+        }
+      }
+      prevAchievementIdsRef.current = ids;
+
       setAchievementIds(ids);
       setAchievementStats(fullStats);
       await updatePublicSnapshot(session.user.id, {
@@ -1656,6 +1733,11 @@ export default function Loadout() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, profileRow, userProgram, workouts, prs, communityActivity]);
+
+  const refreshCommunityActivity = useCallback(async () => {
+    if (!session) return;
+    setCommunityActivity(await getCommunityActivity(session.user.id));
+  }, [session]);
 
   const handleSaveProgram = async (program) => {
     setUserProgram(program);
@@ -1760,16 +1842,19 @@ export default function Loadout() {
   }
 
   const isTop = achievementIds.includes("rank-first");
+  const currentToast = toastQueue[0] || null;
+  const dismissToast = () => setToastQueue((q) => q.slice(1));
 
   return (
     <Shell>
+      {currentToast && <AchievementToast achievement={currentToast} onDismiss={dismissToast} />}
       <div style={{ flex: 1, overflowY: tab === "chat" ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
         {justFinished && tab === "dashboard" && <FinishBanner data={justFinished} onClose={() => setJustFinished(null)} />}
         {tab === "dashboard" && (
           <Dashboard profile={profile} workouts={workouts} stats={stats} onStartWorkout={startWorkout} prs={prs} onOpenProfile={() => setViewingProfile(profile.name)} />
         )}
         {tab === "programs" && (
-          <ProgramsTab profile={profile} onSaveProgram={handleSaveProgram} onStartWorkout={startWorkout} myName={profile.name} myUserId={session.user.id} />
+          <ProgramsTab profile={profile} onSaveProgram={handleSaveProgram} onStartWorkout={startWorkout} myName={profile.name} myUserId={session.user.id} onActivityChange={refreshCommunityActivity} />
         )}
         {tab === "logger" && activeDayIdx !== null && (
           <WorkoutLogger
@@ -1784,10 +1869,12 @@ export default function Loadout() {
           <Chat
             myName={profile.name}
             myUserId={session.user.id}
+            isAdmin={!!profileRow.is_admin}
             streak={stats.streak}
             achievementCount={achievementIds.length}
             isTop={isTop}
             onOpenProfile={setViewingProfile}
+            onActivityChange={refreshCommunityActivity}
           />
         )}
         {tab === "about" && <AboutTab onSignOut={signOut} accountEmail={session.user.email} />}
@@ -1809,6 +1896,7 @@ function Shell({ children }) {
         input:focus { border-color: ${T.rust} !important; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: ${T.line}; border-radius: 3px; }
+        @keyframes toastDrop { from { transform: translateY(-16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         button { -webkit-tap-highlight-color: transparent; }
       `}</style>
       {children}
