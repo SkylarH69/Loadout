@@ -19,6 +19,7 @@ import {
   getWorkouts, insertWorkout, getPRs, upsertPR,
   getUserProgram, setUserProgram as setUserProgram_db,
   setDeloadState,
+  getActiveDraft, setActiveDraft, clearActiveDraft,
   getCommunityActivity, setCommunityActivity as setCommunityActivity_db,
   getChatMessages, sendChatMessage, deleteChatMessage, getProgramComments, sendProgramComment,
 } from "./db.js";
@@ -1089,6 +1090,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
           sets: Array.from({ length: setCount }, () => ({
             weight: suggestion?.weight != null ? String(suggestion.weight) : "",
             reps: suggestion?.reps != null ? String(suggestion.reps) : "",
+            confirmed: false,
           })),
           note: "",
         };
@@ -1113,6 +1115,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 
   const clearDraft = () => {
     try { localStorage.removeItem(draftKey(userId)); } catch { /* ignore */ }
+    clearActiveDraft(userId).catch(() => {});
   };
 
   useEffect(() => {
@@ -1138,7 +1141,23 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       const next = [...prev];
       const sets = next[exIdx].sets;
       const last = sets[sets.length - 1] || { weight: "", reps: "" };
-      next[exIdx] = { ...next[exIdx], sets: [...sets, { weight: last.weight, reps: last.reps }] };
+      next[exIdx] = { ...next[exIdx], sets: [...sets, { weight: last.weight, reps: last.reps, confirmed: false }] };
+      return next;
+    });
+  };
+
+  const confirmSet = (exIdx, setIdx) => {
+    setLog((prev) => {
+      const next = [...prev];
+      const sets = [...next[exIdx].sets];
+      const wasConfirmed = sets[setIdx].confirmed;
+      sets[setIdx] = { ...sets[setIdx], confirmed: !wasConfirmed };
+      next[exIdx] = { ...next[exIdx], sets };
+      // Sync to the server immediately on confirm — a deliberate checkpoint that
+      // survives even if local storage or the device itself lets us down.
+      if (!wasConfirmed) {
+        setActiveDraft(userId, { dayIndex, dayName: day.name, startTime: startTimeRef.current, log: next }).catch(() => {});
+      }
       return next;
     });
   };
@@ -1341,6 +1360,18 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                   <input value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, "weight", e.target.value)} placeholder="lb" inputMode="decimal" style={{ ...INPUT, padding: "10px 12px", fontSize: 14 }} />
                   <span style={{ color: T.chalkDim, fontSize: 13 }}>×</span>
                   <input value={set.reps} onChange={(e) => updateSet(exIdx, setIdx, "reps", e.target.value)} placeholder="reps" inputMode="decimal" style={{ ...INPUT, padding: "10px 12px", fontSize: 14 }} />
+                  <button
+                    onClick={() => confirmSet(exIdx, setIdx)}
+                    title={set.confirmed ? "Confirmed — tap to undo" : "Confirm this set"}
+                    style={{
+                      width: 32, height: 32, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                      border: `1.5px solid ${set.confirmed ? T.moss : T.line}`,
+                      background: set.confirmed ? T.moss : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <Check size={15} color={set.confirmed ? T.iron : T.chalkDim} />
+                  </button>
                   <button onClick={() => removeSet(exIdx, setIdx)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer" }}>
                     <X size={16} />
                   </button>
@@ -1974,19 +2005,25 @@ export default function Loadout() {
       setCommunityActivity(activity);
 
       // Resume an in-progress workout if one was left running when the app closed.
+      // Server-side draft is checked first — it survives cache clears, stale home-screen
+      // icons, or switching devices, in a way local storage alone can't.
       // Guarded so it only runs once per login — this effect can otherwise fire
       // a second time right after setProfileRow above updates profileRow?.id.
       if (!resumeCheckedRef.current) {
         resumeCheckedRef.current = true;
         try {
-          const raw = localStorage.getItem(draftKey(session.user.id));
-          if (raw) {
-            const draft = JSON.parse(raw);
-            if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex]) {
-              setResumeDraft(draft);
-              setActiveDayIdx(draft.dayIndex);
-              setTab("logger");
-            }
+          let draft = null;
+          try {
+            draft = await getActiveDraft(session.user.id);
+          } catch { /* server draft unavailable, fall back to local */ }
+          if (!draft) {
+            const raw = localStorage.getItem(draftKey(session.user.id));
+            if (raw) draft = JSON.parse(raw);
+          }
+          if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex] && draft.log) {
+            setResumeDraft(draft);
+            setActiveDayIdx(draft.dayIndex);
+            setTab("logger");
           }
         } catch { /* corrupted or missing draft, just ignore and start fresh */ }
       }
@@ -2049,6 +2086,7 @@ export default function Loadout() {
   const startWorkout = (dayIdx) => {
     if (session) {
       try { localStorage.removeItem(draftKey(session.user.id)); } catch { /* ignore */ }
+      clearActiveDraft(session.user.id).catch(() => {});
     }
     setResumeDraft(null);
     setActiveDayIdx(dayIdx);
