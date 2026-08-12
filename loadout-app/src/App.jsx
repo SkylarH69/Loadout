@@ -1117,15 +1117,20 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   // another app), which behaves just like closing and reopening even though it
   // doesn't look like it. Force a save the moment the tab is hidden, not just
   // when a set is confirmed, so nothing is lost in that window.
+  // Reads from logRef (kept instantly in sync by setLogSynced) rather than the
+  // `log` variable directly — that avoids a real race where switching apps
+  // immediately after typing could fire this before the effect had a chance
+  // to re-register with the latest value.
   useEffect(() => {
     if (phase !== "log") return;
     const syncNow = () => {
+      const currentLog = logRef.current;
       try {
         localStorage.setItem(draftKey(userId), JSON.stringify({
-          dayIndex, dayName: day.name, startTime: startTimeRef.current, log, savedAt: Date.now(),
+          dayIndex, dayName: day.name, startTime: startTimeRef.current, log: currentLog, savedAt: Date.now(),
         }));
       } catch { /* ignore */ }
-      setActiveDraft(userId, { dayIndex, dayName: day.name, startTime: startTimeRef.current, log }).catch(() => {});
+      setActiveDraft(userId, { dayIndex, dayName: day.name, startTime: startTimeRef.current, log: currentLog }).catch(() => {});
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") syncNow();
@@ -1136,7 +1141,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", syncNow);
     };
-  }, [log, phase, dayIndex, day.name, userId]);
+  }, [phase, dayIndex, day.name, userId]);
 
   const clearDraft = () => {
     try { localStorage.removeItem(draftKey(userId)); } catch { /* ignore */ }
@@ -1151,8 +1156,15 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
     return () => clearInterval(interval);
   }, [phase]);
 
+  const logRef = useRef(log);
+  const setLogSynced = (updater) => {
+    const next = typeof updater === "function" ? updater(logRef.current) : updater;
+    logRef.current = next;
+    setLog(next);
+  };
+
   const updateSet = (exIdx, setIdx, field, value) => {
-    setLog((prev) => {
+    setLogSynced((prev) => {
       const next = [...prev];
       const sets = [...next[exIdx].sets];
       sets[setIdx] = { ...sets[setIdx], [field]: value.replace(/[^0-9.]/g, "") };
@@ -1162,7 +1174,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   };
 
   const addSet = (exIdx) => {
-    setLog((prev) => {
+    setLogSynced((prev) => {
       const next = [...prev];
       const sets = next[exIdx].sets;
       const last = sets[sets.length - 1] || { weight: "", reps: "" };
@@ -1172,7 +1184,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   };
 
   const confirmSet = (exIdx, setIdx) => {
-    setLog((prev) => {
+    setLogSynced((prev) => {
       const next = [...prev];
       const sets = [...next[exIdx].sets];
       const wasConfirmed = sets[setIdx].confirmed;
@@ -1188,7 +1200,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   };
 
   const removeSet = (exIdx, setIdx) => {
-    setLog((prev) => {
+    setLogSynced((prev) => {
       const next = [...prev];
       const sets = next[exIdx].sets.filter((_, i) => i !== setIdx);
       next[exIdx] = { ...next[exIdx], sets: sets.length ? sets : [{ weight: "", reps: "" }] };
@@ -1197,7 +1209,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   };
 
   const updateNote = (exIdx, value) => {
-    setLog((prev) => {
+    setLogSynced((prev) => {
       const next = [...prev];
       next[exIdx] = { ...next[exIdx], note: value };
       return next;
