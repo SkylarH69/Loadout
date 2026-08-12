@@ -147,6 +147,8 @@ export async function getChatMessages() {
     .order("created_at", { ascending: true })
     .limit(150);
   return (data || []).map((m) => ({
+    id: m.id,
+    userId: m.user_id,
     name: m.name,
     text: m.text,
     ts: new Date(m.created_at).getTime(),
@@ -165,6 +167,11 @@ export async function sendChatMessage(userId, msg) {
     achievement_count: msg.achievementCount,
     is_top: msg.isTop,
   });
+  if (error) throw error;
+}
+
+export async function deleteChatMessage(id) {
+  const { error } = await supabase.from("chat_messages").delete().eq("id", id);
   if (error) throw error;
 }
 
