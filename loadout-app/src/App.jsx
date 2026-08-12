@@ -628,7 +628,7 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
 /* ---------------------------------------------------------------------- */
 /* PROGRAMS TAB (library / detail / customize / my plan)                   */
 /* ---------------------------------------------------------------------- */
-function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange }) {
+function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange, autoEdit, onAutoEditHandled }) {
   const [view, setView] = useState(profile ? "mine" : "library");
   const [detailId, setDetailId] = useState(null);
   const [customizeProgram, setCustomizeProgram] = useState(null);
@@ -656,20 +656,32 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
     setView("mine");
   };
 
-  if (view === "mine" && profile) {
-    const openEditor = () => {
-      if (profile.program.sourceId === "custom") {
-        beginBuild(profile.program);
-        return;
-      }
-      const src = PROGRAMS.find((p) => p.id === profile.program.sourceId) || {
-        id: profile.program.sourceId,
-        name: profile.program.splitName,
-        daysPerWeek: profile.program.daysPerWeek,
-        days: profile.program.days,
-      };
-      beginCustomize(src);
+  const openEditor = useCallback(() => {
+    if (!profile) return;
+    if (profile.program.sourceId === "custom") {
+      beginBuild(profile.program);
+      return;
+    }
+    const src = PROGRAMS.find((p) => p.id === profile.program.sourceId) || {
+      id: profile.program.sourceId,
+      name: profile.program.splitName,
+      daysPerWeek: profile.program.daysPerWeek,
+      days: profile.program.days,
     };
+    beginCustomize(src);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+
+  // If we were navigated here specifically to edit (e.g. from the Dashboard's "Up next" card), jump straight in.
+  useEffect(() => {
+    if (autoEdit && profile) {
+      openEditor();
+      onAutoEditHandled && onAutoEditHandled();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (view === "mine" && profile) {
 
     return (
       <div style={{ padding: "24px 18px 100px" }}>
@@ -777,7 +789,7 @@ function getNextDayIndex(workouts, days) {
   return (lastIdx + 1) % days.length;
 }
 
-function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile }) {
+function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext }) {
   const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
@@ -809,8 +821,15 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
       </div>
 
       <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-          Up next — {nextDay.name}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Up next — {nextDay.name}
+          </div>
+          {onEditNext && (
+            <button onClick={onEditNext} title="Edit this plan" style={{ ...ROUND_BTN, width: 30, height: 30, background: "transparent", flexShrink: 0 }}>
+              <Pencil size={13} />
+            </button>
+          )}
         </div>
         <div style={{ color: T.chalkDim, fontSize: 13, marginBottom: 14 }}>{nextDay.exercises.length} exercises · {profile.program.splitName}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
@@ -1694,6 +1713,7 @@ export default function Loadout() {
   const [viewingProfile, setViewingProfile] = useState(null);
   const [toastQueue, setToastQueue] = useState([]);
   const [resumeDraft, setResumeDraft] = useState(null);
+  const [pendingEditProgram, setPendingEditProgram] = useState(false);
   const prevAchievementIdsRef = useRef(null); // null = not computed yet (skip celebrating on first load)
 
   // Track auth session
@@ -1897,10 +1917,27 @@ export default function Loadout() {
       <div style={{ flex: 1, overflowY: tab === "chat" ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
         {justFinished && tab === "dashboard" && <FinishBanner data={justFinished} onClose={() => setJustFinished(null)} />}
         {tab === "dashboard" && (
-          <Dashboard profile={profile} workouts={workouts} stats={stats} onStartWorkout={startWorkout} prs={prs} onOpenProfile={() => setViewingProfile(profile.name)} />
+          <Dashboard
+            profile={profile}
+            workouts={workouts}
+            stats={stats}
+            onStartWorkout={startWorkout}
+            prs={prs}
+            onOpenProfile={() => setViewingProfile(profile.name)}
+            onEditNext={() => { setPendingEditProgram(true); setTab("programs"); }}
+          />
         )}
         {tab === "programs" && (
-          <ProgramsTab profile={profile} onSaveProgram={handleSaveProgram} onStartWorkout={startWorkout} myName={profile.name} myUserId={session.user.id} onActivityChange={refreshCommunityActivity} />
+          <ProgramsTab
+            profile={profile}
+            onSaveProgram={handleSaveProgram}
+            onStartWorkout={startWorkout}
+            myName={profile.name}
+            myUserId={session.user.id}
+            onActivityChange={refreshCommunityActivity}
+            autoEdit={pendingEditProgram}
+            onAutoEditHandled={() => setPendingEditProgram(false)}
+          />
         )}
         {tab === "logger" && activeDayIdx !== null && (
           <WorkoutLogger
