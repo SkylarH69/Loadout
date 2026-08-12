@@ -769,8 +769,16 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
 /* ---------------------------------------------------------------------- */
 /* DASHBOARD                                                               */
 /* ---------------------------------------------------------------------- */
+function getNextDayIndex(workouts, days) {
+  if (!workouts.length) return 0;
+  const lastDayName = workouts[workouts.length - 1].dayName;
+  const lastIdx = days.findIndex((d) => d.name === lastDayName);
+  if (lastIdx === -1) return 0; // last logged day isn't part of the current program (e.g. you switched templates) — start from the top
+  return (lastIdx + 1) % days.length;
+}
+
 function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile }) {
-  const nextDayIdx = workouts.length % profile.program.days.length;
+  const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
 
