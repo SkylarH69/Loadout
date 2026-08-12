@@ -853,21 +853,40 @@ function StatCard({ icon, label, value }) {
 /* ---------------------------------------------------------------------- */
 /* WORKOUT LOGGER                                                          */
 /* ---------------------------------------------------------------------- */
-function WorkoutLogger({ day, onCancel, onFinish, prs }) {
+function draftKey(userId) {
+  return `loadout_active_workout_${userId}`;
+}
+
+function WorkoutLogger({ day, dayIndex, userId, initialDraft, onCancel, onFinish, prs }) {
   const [log, setLog] = useState(
-    day.exercises.map((ex) => ({
-      name: ex.name,
-      target: `${ex.sets}×${ex.reps}`,
-      sets: Array.from({ length: Math.max(1, ex.sets || 1) }, () => ({ weight: "", reps: "" })),
-      note: "",
-    }))
+    initialDraft?.log ||
+      day.exercises.map((ex) => ({
+        name: ex.name,
+        target: `${ex.sets}×${ex.reps}`,
+        sets: Array.from({ length: Math.max(1, ex.sets || 1) }, () => ({ weight: "", reps: "" })),
+        note: "",
+      }))
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
   const [phase, setPhase] = useState("log"); // 'log' | 'summary'
   const [rpe, setRpe] = useState(null);
   const [comment, setComment] = useState("");
-  const startTimeRef = useRef(Date.now());
-  const [elapsed, setElapsed] = useState(0);
+  const startTimeRef = useRef(initialDraft?.startTime || Date.now());
+  const [elapsed, setElapsed] = useState(Math.floor((Date.now() - startTimeRef.current) / 1000));
+
+  // Autosave the in-progress workout locally so closing the app mid-session doesn't lose it.
+  useEffect(() => {
+    if (phase !== "log") return;
+    try {
+      localStorage.setItem(draftKey(userId), JSON.stringify({
+        dayIndex, dayName: day.name, startTime: startTimeRef.current, log,
+      }));
+    } catch { /* storage unavailable, degrade silently — nothing else we can do here */ }
+  }, [log, phase, dayIndex, day.name, userId]);
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(draftKey(userId)); } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     if (phase !== "log") return;
@@ -934,6 +953,7 @@ function WorkoutLogger({ day, onCancel, onFinish, prs }) {
       }))
       .filter((ex) => ex.sets.length > 0);
     if (exercises.length === 0) return;
+    clearDraft();
     onFinish({
       dayName: day.name,
       exercises,
@@ -1015,7 +1035,7 @@ function WorkoutLogger({ day, onCancel, onFinish, prs }) {
   return (
     <div style={{ padding: "20px 18px 110px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <button onClick={onCancel} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+        <button onClick={() => { clearDraft(); onCancel(); }} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
           <ChevronLeft size={18} /> Cancel
         </button>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.rust, fontSize: 13 }}>{Math.round(totalVolume).toLocaleString()} lb total</div>
@@ -1665,6 +1685,7 @@ export default function Loadout() {
   const [achievementStats, setAchievementStats] = useState(null);
   const [viewingProfile, setViewingProfile] = useState(null);
   const [toastQueue, setToastQueue] = useState([]);
+  const [resumeDraft, setResumeDraft] = useState(null);
   const prevAchievementIdsRef = useRef(null); // null = not computed yet (skip celebrating on first load)
 
   // Track auth session
@@ -1697,6 +1718,19 @@ export default function Loadout() {
       setWorkouts(w);
       setPrs(pr);
       setCommunityActivity(activity);
+
+      // Resume an in-progress workout if one was left running when the app closed.
+      try {
+        const raw = localStorage.getItem(draftKey(session.user.id));
+        if (raw) {
+          const draft = JSON.parse(raw);
+          if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex]) {
+            setResumeDraft(draft);
+            setActiveDayIdx(draft.dayIndex);
+            setTab("logger");
+          }
+        }
+      } catch { /* corrupted or missing draft, just ignore and start fresh */ }
     })();
     return () => { cancelled = true; };
   }, [session, profileRow?.id]);
@@ -1754,6 +1788,10 @@ export default function Loadout() {
   };
 
   const startWorkout = (dayIdx) => {
+    if (session) {
+      try { localStorage.removeItem(draftKey(session.user.id)); } catch { /* ignore */ }
+    }
+    setResumeDraft(null);
     setActiveDayIdx(dayIdx);
     setTab("logger");
   };
@@ -1858,9 +1896,13 @@ export default function Loadout() {
         )}
         {tab === "logger" && activeDayIdx !== null && (
           <WorkoutLogger
+            key={activeDayIdx}
             day={profile.program.days[activeDayIdx]}
+            dayIndex={activeDayIdx}
+            userId={session.user.id}
+            initialDraft={resumeDraft}
             prs={prs}
-            onCancel={() => { setActiveDayIdx(null); setTab("programs"); }}
+            onCancel={() => { setActiveDayIdx(null); setTab("programs"); setResumeDraft(null); }}
             onFinish={finishWorkout}
           />
         )}
