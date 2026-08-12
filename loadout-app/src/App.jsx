@@ -789,7 +789,7 @@ function getNextDayIndex(workouts, days) {
   return (lastIdx + 1) % days.length;
 }
 
-function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext }) {
+function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount }) {
   const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
@@ -797,15 +797,30 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
   return (
     <div style={{ padding: "24px 18px 100px" }}>
       <div style={{ fontFamily: "Inter, sans-serif", color: T.chalkDim, fontSize: 14 }}>Welcome back</div>
-      <button
-        onClick={onOpenProfile}
-        style={{
-          fontFamily: "'Oswald', sans-serif", fontSize: 34, color: T.chalk, margin: "2px 0 20px", textTransform: "uppercase",
-          letterSpacing: 0.5, background: "none", border: "none", padding: 0, cursor: onOpenProfile ? "pointer" : "default", display: "block",
-        }}
-      >
-        {profile.name}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        <button
+          onClick={onOpenProfile}
+          style={{
+            fontFamily: "'Oswald', sans-serif", fontSize: 34, color: T.chalk, margin: "2px 0", textTransform: "uppercase",
+            letterSpacing: 0.5, background: "none", border: "none", padding: 0, cursor: onOpenProfile ? "pointer" : "default",
+          }}
+        >
+          {profile.name}
+        </button>
+        {typeof achievementCount === "number" && (
+          <button
+            onClick={onOpenProfile}
+            title="View all achievements"
+            style={{
+              display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: T.brass,
+              border: `1px solid ${T.brass}`, borderRadius: 20, padding: "4px 10px",
+              background: "rgba(232,185,74,0.08)", cursor: onOpenProfile ? "pointer" : "default",
+            }}
+          >
+            <Award size={13} /> {achievementCount} / {ACHIEVEMENTS.length}
+          </button>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
         <StatCard icon={<Flame size={18} color={T.rust} />} label="Streak" value={`${stats.streak}d`} />
@@ -2025,6 +2040,7 @@ export default function Loadout() {
             prs={prs}
             onOpenProfile={() => setViewingProfile(profile.name)}
             onEditNext={() => { setPendingEditProgram(true); setTab("programs"); }}
+            achievementCount={achievementIds.length}
           />
         )}
         {tab === "programs" && (
