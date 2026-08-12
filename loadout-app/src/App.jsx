@@ -30,7 +30,8 @@ const ABOUT = {
   mission:
     "Loadout started with a simple idea: the gym is one of the few places where rank doesn't matter and nobody trains alone. We built this to bring that same accountability online — real programs, honest tracking, and a floor full of people who show up.",
   founderNote:
-    "I served, then I lifted, then I got tired of tracking apps that treat training like a spreadsheet instead of a community. This is built by someone who's been in both rooms.",
+    "I built this because fitness has always been about more than the workout itself. After serving and spending years in the gym, I wanted a place that brings together the progress, the people, and the culture that make training worth coming back to.
+",
 };
 
 const VALUE_PILLARS = [
