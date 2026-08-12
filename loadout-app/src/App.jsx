@@ -19,7 +19,7 @@ import {
   getWorkouts, insertWorkout, getPRs, upsertPR,
   getUserProgram, setUserProgram as setUserProgram_db,
   getCommunityActivity, setCommunityActivity as setCommunityActivity_db,
-  getChatMessages, sendChatMessage, getProgramComments, sendProgramComment,
+  getChatMessages, sendChatMessage, deleteChatMessage, getProgramComments, sendProgramComment,
 } from "./db.js";
 
 /* ---------------------------------------------------------------------- */
