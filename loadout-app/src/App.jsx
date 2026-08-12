@@ -1293,7 +1293,9 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
     setPhase("summary");
   };
 
+  const [savingWorkout, setSavingWorkout] = useState(false);
   const saveWorkout = () => {
+    if (savingWorkout) return; // already submitting — ignore rapid extra taps
     const exercises = log
       .map((ex) => ({
         name: ex.name,
@@ -1302,6 +1304,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       }))
       .filter((ex) => ex.sets.length > 0);
     if (exercises.length === 0) return;
+    setSavingWorkout(true);
     clearDraft();
     onFinish({
       dayName: day.name,
@@ -1375,8 +1378,12 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
           />
         </div>
 
-        <button onClick={saveWorkout} style={BTN_PRIMARY}>
-          <Check size={18} style={{ marginRight: 6 }} /> Save workout
+        <button
+          onClick={saveWorkout}
+          disabled={savingWorkout}
+          style={{ ...BTN_PRIMARY, opacity: savingWorkout ? 0.6 : 1, cursor: savingWorkout ? "not-allowed" : "pointer" }}
+        >
+          <Check size={18} style={{ marginRight: 6 }} /> {savingWorkout ? "Saving…" : "Save workout"}
         </button>
       </div>
     );
