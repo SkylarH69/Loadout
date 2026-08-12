@@ -15,6 +15,9 @@ export const CAT_COLOR = {
   Hypertrophy: T.moss,
   Powerbuilding: T.brass,
   Bodybuilding: "#B9764F",
+  Running: "#5B8A9A",
+  Hybrid: "#C97C3D",
+  "Combat Sports": "#8B3A3A",
 };
 
 /* ---------------------------------------------------------------------- */
@@ -297,6 +300,150 @@ export const PROGRAMS = [
       ]},
     ],
   },
+  {
+    id: "base-building-runner",
+    name: "Base Building Runner",
+    author: "Inspired by Jack Daniels' Running Formula & 80/20 principles",
+    level: "Beginner",
+    category: "Running",
+    daysPerWeek: 3,
+    blurb: "Three weekly runs built on the 80/20 rule — most of your mileage easy, one focused quality session. The aerobic foundation almost every runner needs before adding real speed work.",
+    days: [
+      { name: "Easy Run Day", exercises: [
+        { name: "Easy Run", sets: 1, reps: "30 min @ conversational pace" },
+        { name: "Standing Calf Raise", sets: 3, reps: "15-20" },
+        { name: "Plank", sets: 2, reps: "45s" },
+      ]},
+      { name: "Quality Session", exercises: [
+        { name: "Tempo Run", sets: 1, reps: "20 min @ comfortably hard" },
+        { name: "Glute Bridge", sets: 3, reps: "12-15" },
+        { name: "Dead Bug", sets: 2, reps: "10 each side" },
+      ]},
+      { name: "Long Run Day", exercises: [
+        { name: "Long Run", sets: 1, reps: "45-60 min @ easy pace" },
+        { name: "Walking Lunge", sets: 2, reps: "10 each side" },
+        { name: "Hanging Knee Raise", sets: 2, reps: "12" },
+      ]},
+    ],
+  },
+  {
+    id: "5k-speed-builder",
+    name: "5K Speed Builder",
+    author: "VDOT-based pacing, inspired by Jack Daniels' Running Formula",
+    level: "Intermediate",
+    category: "Running",
+    daysPerWeek: 4,
+    blurb: "Four runs a week built around real physiological training zones — easy, threshold, and interval pace — the same structure coaches use to build speed without burning runners out.",
+    days: [
+      { name: "Easy Run", exercises: [
+        { name: "Easy Run", sets: 1, reps: "25-30 min easy" },
+      ]},
+      { name: "Interval Session", exercises: [
+        { name: "Interval Run", sets: 6, reps: "400m @ 5K pace, 90s rest" },
+      ]},
+      { name: "Tempo Run", exercises: [
+        { name: "Tempo Run", sets: 1, reps: "20-25 min @ threshold pace" },
+      ]},
+      { name: "Long Run", exercises: [
+        { name: "Long Run", sets: 1, reps: "60 min easy" },
+      ]},
+    ],
+  },
+  {
+    id: "hybrid-strength-endurance",
+    name: "Hybrid Athlete: Strength + Endurance",
+    author: "Concurrent training principles — managing the interference effect",
+    level: "Intermediate",
+    category: "Hybrid",
+    daysPerWeek: 5,
+    blurb: "Strength and endurance without one sabotaging the other — hard lifting and hard running stay on separate days, following the research on training-interference management.",
+    days: [
+      { name: "Lower Strength", exercises: [
+        { name: "Barbell Squat", sets: 4, reps: "6-8" },
+        { name: "Romanian Deadlift", sets: 3, reps: "8-10" },
+        { name: "Standing Calf Raise", sets: 3, reps: "12-15" },
+      ]},
+      { name: "Easy Run + Core", exercises: [
+        { name: "Easy Run", sets: 1, reps: "30 min easy" },
+        { name: "Plank", sets: 3, reps: "45s" },
+      ]},
+      { name: "Upper Strength", exercises: [
+        { name: "Bench Press", sets: 4, reps: "6-8" },
+        { name: "Barbell Row", sets: 4, reps: "6-8" },
+        { name: "Overhead Press", sets: 3, reps: "8-10" },
+      ]},
+      { name: "Interval Run", exercises: [
+        { name: "Interval Run", sets: 5, reps: "800m @ 5K pace, 2 min rest" },
+      ]},
+      { name: "Long Run", exercises: [
+        { name: "Long Run", sets: 1, reps: "45-60 min easy" },
+      ]},
+    ],
+  },
+  {
+    id: "bjj-strength-conditioning",
+    name: "BJJ Strength & Conditioning",
+    author: "Grounded in combat-sports S&C principles",
+    level: "Intermediate",
+    category: "Combat Sports",
+    daysPerWeek: 4,
+    blurb: "Built for grapplers: explosive hip power for sweeps and guard retention, rotational core strength, grip and neck endurance, and conditioning intervals matched to real round length.",
+    days: [
+      { name: "Strength — Squat & Pull", exercises: [
+        { name: "Barbell Squat", sets: 4, reps: "5-6" },
+        { name: "Barbell Row", sets: 3, reps: "8-10" },
+        { name: "Neck Bridge", sets: 3, reps: "10" },
+        { name: "Farmer's Carry", sets: 3, reps: "40m" },
+      ]},
+      { name: "Power & Conditioning", exercises: [
+        { name: "Kettlebell Swing", sets: 4, reps: "15" },
+        { name: "Box Jump", sets: 4, reps: "5" },
+        { name: "Rowing Machine", sets: 5, reps: "2 min hard, 1 min rest" },
+      ]},
+      { name: "Strength — Press & Core", exercises: [
+        { name: "Overhead Press", sets: 4, reps: "6-8" },
+        { name: "Pull-Up", sets: 3, reps: "8-10" },
+        { name: "Pallof Press", sets: 3, reps: "12 each side" },
+        { name: "Wrist Roller", sets: 2, reps: "1 min" },
+      ]},
+      { name: "Conditioning & Grip", exercises: [
+        { name: "Battle Ropes", sets: 5, reps: "30s on / 30s off" },
+        { name: "Turkish Get-Up", sets: 3, reps: "5 each side" },
+        { name: "Dead Hang", sets: 3, reps: "30-45s" },
+      ]},
+    ],
+  },
+  {
+    id: "hybrid-race-training",
+    name: "Hybrid Race Training",
+    author: "Functional fitness + running hybrid, inspired by Hyrox-style race prep",
+    level: "Intermediate",
+    category: "Hybrid",
+    daysPerWeek: 4,
+    blurb: "Alternating running with loaded functional work — sled pushes, farmer carries, wall balls — training the exact skill these hybrid races test: switching between engine and strength under fatigue.",
+    days: [
+      { name: "Compromised Running", exercises: [
+        { name: "Interval Run", sets: 4, reps: "800m" },
+        { name: "Sled Push", sets: 4, reps: "20m" },
+      ]},
+      { name: "Strength Base", exercises: [
+        { name: "Barbell Squat", sets: 4, reps: "8-10" },
+        { name: "Deadlift", sets: 3, reps: "5" },
+        { name: "Farmer's Carry", sets: 3, reps: "40m" },
+      ]},
+      { name: "Engine Day", exercises: [
+        { name: "Rowing Machine", sets: 1, reps: "20 min steady" },
+        { name: "Wall Ball", sets: 5, reps: "15" },
+        { name: "Burpee", sets: 5, reps: "10" },
+      ]},
+      { name: "Race Simulation", exercises: [
+        { name: "Easy Run", sets: 1, reps: "20 min" },
+        { name: "Sled Pull", sets: 3, reps: "20m" },
+        { name: "Kettlebell Swing", sets: 4, reps: "15" },
+        { name: "Box Jump", sets: 3, reps: "8" },
+      ]},
+    ],
+  },
 ];
 
 /* ---------------------------------------------------------------------- */
@@ -509,4 +656,20 @@ export const EXERCISE_LIBRARY = [
   { name: "Sprint Intervals", category: "Cardio" },
   { name: "Ski Erg", category: "Cardio" },
   { name: "Shuttle Run", category: "Cardio" },
+  // Running
+  { name: "Easy Run", category: "Running" },
+  { name: "Tempo Run", category: "Running" },
+  { name: "Long Run", category: "Running" },
+  { name: "Interval Run", category: "Running" },
+  { name: "Fartlek Run", category: "Running" },
+  { name: "Hill Sprints", category: "Running" },
+  { name: "Recovery Run", category: "Running" },
+  { name: "Progression Run", category: "Running" },
+  // Combat Sports
+  { name: "Neck Bridge", category: "Combat Sports" },
+  { name: "Neck Curl", category: "Combat Sports" },
+  { name: "Shrimp Escape Drill", category: "Combat Sports" },
+  { name: "Sprawl Drill", category: "Combat Sports" },
+  { name: "Grip Trainer Squeeze", category: "Combat Sports" },
+  { name: "Towel Pull-Up", category: "Combat Sports" },
 ];
