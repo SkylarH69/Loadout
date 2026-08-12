@@ -80,7 +80,10 @@ export async function setDeloadState(userId, state) {
 export async function getActiveDraft(userId) {
   const { data } = await supabase.from("active_workout_draft").select("*").eq("user_id", userId).maybeSingle();
   if (!data) return null;
-  return { dayIndex: data.day_index, dayName: data.day_name, startTime: Number(data.start_time), log: data.log };
+  return {
+    dayIndex: data.day_index, dayName: data.day_name, startTime: Number(data.start_time), log: data.log,
+    savedAt: data.updated_at ? new Date(data.updated_at).getTime() : 0,
+  };
 }
 
 export async function setActiveDraft(userId, draft) {
