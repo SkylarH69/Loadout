@@ -1139,6 +1139,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       })
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
+  const [swapExerciseFor, setSwapExerciseFor] = useState(null); // exercise index being swapped mid-workout
   const [phase, setPhase] = useState("log"); // 'log' | 'summary'
   const [rpe, setRpe] = useState(null);
   const [comment, setComment] = useState("");
@@ -1256,6 +1257,29 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       next[exIdx] = { ...next[exIdx], note: value };
       return next;
     });
+  };
+
+  const swapExercise = (exIdx, newName) => {
+    setLogSynced((prev) => {
+      const next = [...prev];
+      const current = next[exIdx];
+      const setCount = current.sets.length || 1;
+      const suggestion = deloadActive
+        ? suggestDeloadTarget(newName, current.target?.split("×")[1] || "", workouts || [])
+        : suggestNextTarget(newName, current.target?.split("×")[1] || "", workouts || []);
+      next[exIdx] = {
+        ...current,
+        name: newName,
+        progressNote: suggestion?.note || null,
+        sets: Array.from({ length: setCount }, () => ({
+          weight: suggestion?.weight != null ? String(suggestion.weight) : "",
+          reps: suggestion?.reps != null ? String(suggestion.reps) : "",
+          confirmed: false,
+        })),
+      };
+      return next;
+    });
+    setSwapExerciseFor(null);
   };
 
   const totalVolume = log.reduce(
@@ -1391,11 +1415,19 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       {log.map((ex, exIdx) => {
         const currentPR = prs[ex.name]?.weight;
         const noteOpen = noteOpenFor === exIdx;
+        const isSwappingEx = swapExerciseFor === exIdx;
         return (
           <div key={ex.name + exIdx} style={{ ...CARD, marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
               <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <button
+                  onClick={() => setSwapExerciseFor(isSwappingEx ? null : exIdx)}
+                  title="Swap this exercise"
+                  style={{ background: "none", border: "none", cursor: "pointer", color: isSwappingEx ? T.rust : T.chalkDim, display: "flex", alignItems: "center" }}
+                >
+                  <Repeat size={15} />
+                </button>
                 <button
                   onClick={() => setNoteOpenFor(noteOpen ? null : exIdx)}
                   title="Private note"
@@ -1409,6 +1441,12 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                 <div style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{ex.target}</div>
               </div>
             </div>
+            {isSwappingEx && (
+              <ExercisePicker
+                onAdd={(newName) => swapExercise(exIdx, newName)}
+                onClose={() => setSwapExerciseFor(null)}
+              />
+            )}
             {currentPR && <div style={{ fontSize: 11.5, color: T.brass, marginBottom: 6 }}>PR: {currentPR} lb</div>}
             {ex.progressNote && (
               <div style={{
