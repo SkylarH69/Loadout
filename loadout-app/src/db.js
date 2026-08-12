@@ -77,6 +77,27 @@ export async function setDeloadState(userId, state) {
   await supabase.from("profiles").update({ deload_state: state }).eq("id", userId);
 }
 
+export async function getActiveDraft(userId) {
+  const { data } = await supabase.from("active_workout_draft").select("*").eq("user_id", userId).maybeSingle();
+  if (!data) return null;
+  return { dayIndex: data.day_index, dayName: data.day_name, startTime: Number(data.start_time), log: data.log };
+}
+
+export async function setActiveDraft(userId, draft) {
+  await supabase.from("active_workout_draft").upsert({
+    user_id: userId,
+    day_index: draft.dayIndex,
+    day_name: draft.dayName,
+    start_time: draft.startTime,
+    log: draft.log,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+export async function clearActiveDraft(userId) {
+  await supabase.from("active_workout_draft").delete().eq("user_id", userId);
+}
+
 /* ---------------------------------------------------------------------- */
 /* PERSONAL RECORDS                                                        */
 /* ---------------------------------------------------------------------- */
