@@ -1113,6 +1113,31 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
     } catch { /* storage unavailable, degrade silently — nothing else we can do here */ }
   }, [log, phase, dayIndex, day.name, userId]);
 
+  // Mobile browsers can silently reload a backgrounded tab (e.g. switching to
+  // another app), which behaves just like closing and reopening even though it
+  // doesn't look like it. Force a save the moment the tab is hidden, not just
+  // when a set is confirmed, so nothing is lost in that window.
+  useEffect(() => {
+    if (phase !== "log") return;
+    const syncNow = () => {
+      try {
+        localStorage.setItem(draftKey(userId), JSON.stringify({
+          dayIndex, dayName: day.name, startTime: startTimeRef.current, log,
+        }));
+      } catch { /* ignore */ }
+      setActiveDraft(userId, { dayIndex, dayName: day.name, startTime: startTimeRef.current, log }).catch(() => {});
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") syncNow();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", syncNow);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", syncNow);
+    };
+  }, [log, phase, dayIndex, day.name, userId]);
+
   const clearDraft = () => {
     try { localStorage.removeItem(draftKey(userId)); } catch { /* ignore */ }
     clearActiveDraft(userId).catch(() => {});
