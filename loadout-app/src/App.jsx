@@ -1938,6 +1938,7 @@ export default function Loadout() {
   const [viewingProfile, setViewingProfile] = useState(null);
   const [toastQueue, setToastQueue] = useState([]);
   const [resumeDraft, setResumeDraft] = useState(null);
+  const resumeCheckedRef = useRef(false);
   const [pendingEditProgram, setPendingEditProgram] = useState(false);
   const prevAchievementIdsRef = useRef(null); // null = not computed yet (skip celebrating on first load)
 
@@ -1973,17 +1974,22 @@ export default function Loadout() {
       setCommunityActivity(activity);
 
       // Resume an in-progress workout if one was left running when the app closed.
-      try {
-        const raw = localStorage.getItem(draftKey(session.user.id));
-        if (raw) {
-          const draft = JSON.parse(raw);
-          if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex]) {
-            setResumeDraft(draft);
-            setActiveDayIdx(draft.dayIndex);
-            setTab("logger");
+      // Guarded so it only runs once per login — this effect can otherwise fire
+      // a second time right after setProfileRow above updates profileRow?.id.
+      if (!resumeCheckedRef.current) {
+        resumeCheckedRef.current = true;
+        try {
+          const raw = localStorage.getItem(draftKey(session.user.id));
+          if (raw) {
+            const draft = JSON.parse(raw);
+            if (prog && draft && typeof draft.dayIndex === "number" && prog.days[draft.dayIndex]) {
+              setResumeDraft(draft);
+              setActiveDayIdx(draft.dayIndex);
+              setTab("logger");
+            }
           }
-        }
-      } catch { /* corrupted or missing draft, just ignore and start fresh */ }
+        } catch { /* corrupted or missing draft, just ignore and start fresh */ }
+      }
     })();
     return () => { cancelled = true; };
   }, [session, profileRow?.id]);
@@ -2096,6 +2102,7 @@ export default function Loadout() {
     setUserProgram(null);
     setWorkouts([]);
     setPrs({});
+    resumeCheckedRef.current = false;
     setTab("dashboard");
   };
 
