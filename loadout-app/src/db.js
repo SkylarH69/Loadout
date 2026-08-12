@@ -53,6 +53,7 @@ export async function getWorkouts(userId) {
     rpe: w.rpe,
     comment: w.comment,
     finishedAt: w.finished_at ? new Date(w.finished_at).getTime() : null,
+    isDeload: !!w.is_deload,
   }));
 }
 
@@ -67,8 +68,13 @@ export async function insertWorkout(userId, entry) {
     rpe: entry.rpe,
     comment: entry.comment,
     finished_at: new Date(entry.finishedAt).toISOString(),
+    is_deload: !!entry.isDeload,
   });
   if (error) throw error;
+}
+
+export async function setDeloadState(userId, state) {
+  await supabase.from("profiles").update({ deload_state: state }).eq("id", userId);
 }
 
 /* ---------------------------------------------------------------------- */
