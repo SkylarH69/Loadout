@@ -884,15 +884,105 @@ function draftKey(userId) {
   return `loadout_active_workout_${userId}`;
 }
 
-function WorkoutLogger({ day, dayIndex, userId, initialDraft, onCancel, onFinish, prs }) {
+/* ---------------------------------------------------------------------- */
+/* PROGRESSIVE OVERLOAD ENGINE                                             */
+/* Grounded in: linear load progression (StrongLifts/Starting Strength     */
+/* protocol — small fixed jumps only after a clean session), the double    */
+/* progression method (climb reps to the top of the range before adding    */
+/* load, then reset), and RPE-based autoregulation (dial back the jump     */
+/* after a session that felt very hard).                                   */
+/* ---------------------------------------------------------------------- */
+function classifyIncrement(name) {
+  const bodyweightNoLoad =
+    /(push-up|pull-up|chin-up|inverted row|plank|sit-up|crunch|^dip$|hanging|l-sit|dragon flag|burpee|mountain climber|bear crawl|^glute bridge$|bodyweight)/i.test(name) &&
+    !/(weighted|cable|machine|dumbbell|barbell|band)/i.test(name);
+  if (bodyweightNoLoad) return { type: "bodyweight", inc: 0 };
+  if (/deadlift/i.test(name)) return { type: "barbell", inc: 10 };
+  if (/(squat)/i.test(name) && !/(goblet|split|bulgarian|pistol)/i.test(name)) return { type: "barbell", inc: 5 };
+  if (/(bench press|overhead press|push press|barbell row|pendlay row|t-bar row)/i.test(name) && !/(dumbbell|machine|smith)/i.test(name)) return { type: "barbell", inc: 5 };
+  if (/dumbbell/i.test(name)) return { type: "dumbbell", inc: 5 };
+  if (/(machine|cable|pulldown|leg press|leg curl|leg extension|pec deck|smith)/i.test(name)) return { type: "machine", inc: 5 };
+  if (/(curl|raise|extension|fly|kickback|pushdown|shrug)/i.test(name)) return { type: "isolation", inc: 2.5 };
+  return { type: "general", inc: 5 };
+}
+
+function parseRepTarget(repsStr) {
+  if (!repsStr) return null;
+  const s = repsStr.trim().toLowerCase();
+  if (s.includes("/") || s.includes("+")) return { type: "percentage" };
+  if (s.includes("s")) return { type: "time" };
+  if (s === "max") return { type: "amrap" };
+  const range = s.match(/^(\d+)\s*-\s*(\d+)$/);
+  if (range) return { type: "range", min: parseInt(range[1], 10), max: parseInt(range[2], 10) };
+  const single = s.match(/^(\d+)$/);
+  if (single) return { type: "fixed", min: parseInt(single[1], 10), max: parseInt(single[1], 10) };
+  return null;
+}
+
+function suggestNextTarget(exerciseName, targetRepsStr, workouts) {
+  for (let i = workouts.length - 1; i >= 0; i--) {
+    const match = workouts[i].exercises?.find((e) => e.name === exerciseName);
+    if (!match || match.sets.length === 0) continue;
+
+    const lastSets = match.sets;
+    const target = parseRepTarget(targetRepsStr);
+    const { type: liftType, inc } = classifyIncrement(exerciseName);
+    const lastWeight = Math.max(...lastSets.map((s) => s.weight));
+    const minRepsAtLastWeight = Math.min(...lastSets.filter((s) => s.weight === lastWeight).map((s) => s.reps));
+
+    const rpe = workouts[i].rpe;
+    const dampened = typeof rpe === "number" && rpe >= 9;
+    const adjInc = dampened ? Math.max(2.5, inc / 2) : inc;
+    const rpeSuffix = dampened ? ` That session was RPE ${rpe}, so we're keeping the jump conservative.` : "";
+
+    if (liftType === "bodyweight") {
+      const bestReps = Math.max(...lastSets.map((s) => s.reps));
+      return { weight: null, reps: bestReps + 1, note: `Best set last time was ${bestReps} reps — aim to beat it by at least 1.` };
+    }
+    if (!target || target.type === "percentage") {
+      return { weight: lastWeight, reps: null, note: `Percentage-based — this follows your training max, not a per-session jump. Last top set: ${lastWeight} lb × ${Math.max(...lastSets.map((s) => s.reps))}.` };
+    }
+    if (target.type === "time" || target.type === "amrap") {
+      return { weight: lastWeight || null, reps: null, note: `Last time: ${lastWeight ? `${lastWeight} lb, ` : ""}${Math.max(...lastSets.map((s) => s.reps))} reps. Try to match or beat it.` };
+    }
+    if (target.type === "fixed") {
+      if (minRepsAtLastWeight >= target.max) {
+        return { weight: lastWeight + adjInc, reps: target.min, note: `You hit all ${target.max} reps at ${lastWeight} lb last time — add ${adjInc} lb today.${rpeSuffix}` };
+      }
+      return { weight: lastWeight, reps: target.min, note: `You missed a rep at ${lastWeight} lb last time — repeat this weight until every set is clean.` };
+    }
+    if (target.type === "range") {
+      if (minRepsAtLastWeight >= target.max) {
+        return { weight: lastWeight + adjInc, reps: target.min, note: `You hit the top of your range (${target.max}) at ${lastWeight} lb — add ${adjInc} lb and reset to ${target.min} reps.${rpeSuffix}` };
+      }
+      if (minRepsAtLastWeight < target.min) {
+        return { weight: lastWeight, reps: target.min, note: `You were under range last time (${minRepsAtLastWeight}) — stay at ${lastWeight} lb, aim for ${target.min}+.` };
+      }
+      const nextReps = Math.min(minRepsAtLastWeight + 1, target.max);
+      return { weight: lastWeight, reps: nextReps, note: `Same weight, push for ${nextReps} reps today — you're not at the top of your range yet.` };
+    }
+    return { weight: lastWeight, reps: minRepsAtLastWeight, note: `Last time: ${lastWeight} lb × ${minRepsAtLastWeight}.` };
+  }
+  return null; // no history logged for this exercise yet
+}
+
+function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, onCancel, onFinish, prs }) {
   const [log, setLog] = useState(
     initialDraft?.log ||
-      day.exercises.map((ex) => ({
-        name: ex.name,
-        target: `${ex.sets}×${ex.reps}`,
-        sets: Array.from({ length: Math.max(1, ex.sets || 1) }, () => ({ weight: "", reps: "" })),
-        note: "",
-      }))
+      day.exercises.map((ex) => {
+        const suggestion = suggestNextTarget(ex.name, ex.reps, workouts || []);
+        const setCount = Math.max(1, ex.sets || 1);
+        return {
+          name: ex.name,
+          target: `${ex.sets}×${ex.reps}`,
+          progressNote: suggestion?.note || null,
+          sets: Array.from({ length: setCount }, () => ({
+            weight: suggestion?.weight != null ? String(suggestion.weight) : "",
+            reps: suggestion?.reps != null ? String(suggestion.reps) : "",
+          })),
+          note: "",
+        };
+      })
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
   const [phase, setPhase] = useState("log"); // 'log' | 'summary'
@@ -1101,7 +1191,17 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, onCancel, onFinish
                 <div style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{ex.target}</div>
               </div>
             </div>
-            {currentPR && <div style={{ fontSize: 11.5, color: T.brass, marginBottom: 10 }}>PR: {currentPR} lb</div>}
+            {currentPR && <div style={{ fontSize: 11.5, color: T.brass, marginBottom: 6 }}>PR: {currentPR} lb</div>}
+            {ex.progressNote && (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: T.moss,
+                background: "rgba(143,184,155,0.1)", border: `1px solid rgba(143,184,155,0.3)`,
+                borderRadius: 8, padding: "7px 10px", marginBottom: 10, lineHeight: 1.4,
+              }}>
+                <TrendingUp size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>{ex.progressNote}</span>
+              </div>
+            )}
 
             {noteOpen && (
               <textarea
@@ -1946,6 +2046,7 @@ export default function Loadout() {
             dayIndex={activeDayIdx}
             userId={session.user.id}
             initialDraft={resumeDraft}
+            workouts={workouts}
             prs={prs}
             onCancel={() => { setActiveDayIdx(null); setTab("programs"); setResumeDraft(null); }}
             onFinish={finishWorkout}
