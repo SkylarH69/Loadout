@@ -382,10 +382,11 @@ function ensureIds(days) {
   }));
 }
 
-function Customizer({ sourceProgram, initialDays, onCancel, onSave }) {
+function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }) {
   const [days, setDays] = useState(() => ensureIds(initialDays || sourceProgram.days));
   const [pickerFor, setPickerFor] = useState(null);
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
+  const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
   const updateExercise = (dayId, exId, field, value) => {
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
@@ -428,15 +429,22 @@ function Customizer({ sourceProgram, initialDays, onCancel, onSave }) {
     });
   };
 
+  const visibleDays = focusDayId && !showAllDays ? days.filter((d) => d.id === focusDayId) : days;
+
   return (
     <div style={{ padding: "20px 18px 110px" }}>
       <button onClick={onCancel} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
         <ArrowLeft size={16} /> Cancel
       </button>
-      <h1 style={TITLE}>{sourceProgram.name}</h1>
+      <h1 style={TITLE}>{focusDayId && !showAllDays ? visibleDays[0]?.name : sourceProgram.name}</h1>
       <p style={{ ...P, marginTop: 6 }}>Rename exercises, adjust sets, or add and remove lifts to make this yours.</p>
+      {focusDayId && !showAllDays && (
+        <button onClick={() => setShowAllDays(true)} style={{ ...BTN_SECONDARY, marginBottom: 18 }}>
+          <Layers size={15} style={{ marginRight: 8 }} /> Edit other days too
+        </button>
+      )}
 
-      {days.map((day) => (
+      {visibleDays.map((day) => (
         <div key={day.id} style={{ ...CARD, marginBottom: 14 }}>
           <input
             value={day.name}
@@ -522,13 +530,14 @@ function Customizer({ sourceProgram, initialDays, onCancel, onSave }) {
 /* ---------------------------------------------------------------------- */
 /* CUSTOM BUILDER — full control over frequency, volume, and exercises     */
 /* ---------------------------------------------------------------------- */
-function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
+function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave }) {
   const [name, setName] = useState(initialName || "My Custom Program");
   const [days, setDays] = useState(() =>
     initialDays && initialDays.length ? ensureIds(initialDays) : [{ id: nextId(), name: "Day 1", exercises: [] }]
   );
   const [pickerFor, setPickerFor] = useState(null);
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
+  const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
   const addDay = () => {
     setDays((prev) => [...prev, { id: nextId(), name: `Day ${prev.length + 1}`, exercises: [] }]);
@@ -593,33 +602,43 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
       }}>
         <Sparkles size={12} /> Create Your Own
       </div>
-      <h1 style={TITLE}>Build Your Program</h1>
-      <p style={{ ...P, marginTop: 6 }}>Name it, set your frequency, and pull in exercises from the full library.</p>
+      <h1 style={TITLE}>{focusDayId && !showAllDays ? (days.find((d) => d.id === focusDayId)?.name || "Build Your Program") : "Build Your Program"}</h1>
+      <p style={{ ...P, marginTop: 6 }}>{focusDayId && !showAllDays ? "Rename exercises, adjust sets, or add and remove lifts for this workout." : "Name it, set your frequency, and pull in exercises from the full library."}</p>
 
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 12, color: T.chalkDim, marginBottom: 6 }}>Program name</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={INPUT} />
-      </div>
-
-      <div style={{ ...CARD, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Frequency</div>
-          <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 2 }}>{days.length} training day{days.length !== 1 ? "s" : ""} a week</div>
+      {(!focusDayId || showAllDays) && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 12, color: T.chalkDim, marginBottom: 6 }}>Program name</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} style={INPUT} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => days.length > 1 && removeDay(days[days.length - 1].id)} style={ROUND_BTN}>
-            <Minus size={16} />
-          </button>
-          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, color: T.chalk, minWidth: 26, textAlign: "center" }}>
-            {days.length}
-          </span>
-          <button onClick={addDay} style={ROUND_BTN}>
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
+      )}
 
-      {days.map((day) => (
+      {focusDayId && !showAllDays && (
+        <button onClick={() => setShowAllDays(true)} style={{ ...BTN_SECONDARY, marginBottom: 18 }}>
+          <Layers size={15} style={{ marginRight: 8 }} /> Edit other days too
+        </button>
+      )}
+
+      {(!focusDayId || showAllDays) && (
+        <div style={{ ...CARD, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Frequency</div>
+            <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 2 }}>{days.length} training day{days.length !== 1 ? "s" : ""} a week</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => days.length > 1 && removeDay(days[days.length - 1].id)} style={ROUND_BTN}>
+              <Minus size={16} />
+            </button>
+            <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, color: T.chalk, minWidth: 26, textAlign: "center" }}>
+              {days.length}
+            </span>
+            <button onClick={addDay} style={ROUND_BTN}>
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(focusDayId && !showAllDays ? days.filter((d) => d.id === focusDayId) : days).map((day) => (
         <div key={day.id} style={{ ...CARD, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <input
@@ -705,9 +724,11 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
         </div>
       ))}
 
-      <button onClick={addDay} style={{ ...BTN_SECONDARY, marginBottom: 18 }}>
-        <Plus size={16} style={{ marginRight: 6 }} /> Add another day
-      </button>
+      {(!focusDayId || showAllDays) && (
+        <button onClick={addDay} style={{ ...BTN_SECONDARY, marginBottom: 18 }}>
+          <Plus size={16} style={{ marginRight: 6 }} /> Add another day
+        </button>
+      )}
 
       <button onClick={save} disabled={totalExercises === 0} style={{ ...BTN_PRIMARY, opacity: totalExercises === 0 ? 0.4 : 1, cursor: totalExercises === 0 ? "not-allowed" : "pointer" }}>
         <Check size={18} style={{ marginRight: 6 }} /> Save program
@@ -719,7 +740,7 @@ function CustomBuilder({ initialName, initialDays, onCancel, onSave }) {
 /* ---------------------------------------------------------------------- */
 /* PROGRAMS TAB (library / detail / customize / my plan)                   */
 /* ---------------------------------------------------------------------- */
-function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange, autoEdit, onAutoEditHandled }) {
+function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange, autoEdit, autoEditDayId, onAutoEditHandled }) {
   const [view, setView] = useState(profile ? "mine" : "library");
   const [detailId, setDetailId] = useState(null);
   const [customizeProgram, setCustomizeProgram] = useState(null);
@@ -728,16 +749,17 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
   const openDetail = (id) => { setDetailId(id); setView("detail"); };
   const detailProgram = PROGRAMS.find((p) => p.id === detailId);
 
-  const beginCustomize = (program) => {
+  const beginCustomize = (program, focusDayId) => {
     const isCurrent = profile && profile.program.sourceId === program.id;
-    setCustomizeProgram({ program, initialDays: isCurrent ? profile.program.days : null });
+    setCustomizeProgram({ program, initialDays: isCurrent ? profile.program.days : null, focusDayId });
     setView("customize");
   };
 
-  const beginBuild = (existingProgram) => {
+  const beginBuild = (existingProgram, focusDayId) => {
     setBuildState({
       name: existingProgram ? existingProgram.splitName : "My Custom Program",
       days: existingProgram ? existingProgram.days : null,
+      focusDayId,
     });
     setView("build");
   };
@@ -747,10 +769,10 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
     setView("mine");
   };
 
-  const openEditor = useCallback(() => {
+  const openEditor = useCallback((focusDayId) => {
     if (!profile) return;
     if (profile.program.sourceId === "custom") {
-      beginBuild(profile.program);
+      beginBuild(profile.program, focusDayId);
       return;
     }
     const src = PROGRAMS.find((p) => p.id === profile.program.sourceId) || {
@@ -759,14 +781,14 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
       daysPerWeek: profile.program.daysPerWeek,
       days: profile.program.days,
     };
-    beginCustomize(src);
+    beginCustomize(src, focusDayId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   // If we were navigated here specifically to edit (e.g. from the Dashboard's "Up next" card), jump straight in.
   useEffect(() => {
     if (autoEdit && profile) {
-      openEditor();
+      openEditor(autoEditDayId);
       onAutoEditHandled && onAutoEditHandled();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -791,8 +813,8 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
               <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 17, color: T.chalk, textTransform: "uppercase" }}>{day.name}</div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <button
-                  onClick={openEditor}
-                  title="Edit this plan"
+                  onClick={() => openEditor(day.id)}
+                  title="Edit this workout"
                   style={{ ...ROUND_BTN, width: 34, height: 34, background: "transparent" }}
                 >
                   <Pencil size={14} />
@@ -813,7 +835,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
           </div>
         ))}
         <button
-          onClick={openEditor}
+          onClick={() => openEditor()}
           style={{ ...BTN_SECONDARY, marginTop: 4 }}
         >
           <Pencil size={15} style={{ marginRight: 8 }} /> Edit this template
@@ -841,6 +863,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
       <Customizer
         sourceProgram={customizeProgram.program}
         initialDays={customizeProgram.initialDays}
+        focusDayId={customizeProgram.focusDayId}
         onCancel={() => setView(profile ? "mine" : "library")}
         onSave={handleSave}
       />
@@ -852,6 +875,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
       <CustomBuilder
         initialName={buildState.name}
         initialDays={buildState.days}
+        focusDayId={buildState.focusDayId}
         onCancel={() => setView(profile ? "mine" : "library")}
         onSave={handleSave}
       />
@@ -2271,6 +2295,7 @@ export default function Loadout() {
   const [resumeDraft, setResumeDraft] = useState(null);
   const resumeCheckedRef = useRef(false);
   const [pendingEditProgram, setPendingEditProgram] = useState(false);
+  const [pendingEditDayId, setPendingEditDayId] = useState(null);
   const prevAchievementIdsRef = useRef(null); // null = not computed yet (skip celebrating on first load)
 
   // Track auth session
@@ -2547,7 +2572,12 @@ export default function Loadout() {
             onStartWorkout={startWorkout}
             prs={prs}
             onOpenProfile={() => setViewingProfile(profile.name)}
-            onEditNext={() => { setPendingEditProgram(true); setTab("programs"); }}
+            onEditNext={() => {
+              const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
+              setPendingEditDayId(profile.program.days[nextDayIdx]?.id || null);
+              setPendingEditProgram(true);
+              setTab("programs");
+            }}
             achievementCount={achievementIds.length}
             deloadSignal={deloadSignal}
             deloadState={deloadState}
@@ -2565,7 +2595,8 @@ export default function Loadout() {
             myUserId={session.user.id}
             onActivityChange={refreshCommunityActivity}
             autoEdit={pendingEditProgram}
-            onAutoEditHandled={() => setPendingEditProgram(false)}
+            autoEditDayId={pendingEditDayId}
+            onAutoEditHandled={() => { setPendingEditProgram(false); setPendingEditDayId(null); }}
           />
         )}
         {tab === "logger" && activeDayIdx !== null && (
