@@ -673,3 +673,93 @@ export const EXERCISE_LIBRARY = [
   { name: "Grip Trainer Squeeze", category: "Combat Sports" },
   { name: "Towel Pull-Up", category: "Combat Sports" },
 ];
+
+/* ---------------------------------------------------------------------- */
+/* WARM-UP ENGINE                                                          */
+/* Grounded in the RAMP protocol (Raise, Activate & Mobilize, Potentiate) — */
+/* a widely used evidence-informed warm-up structure in strength & con-    */
+/* ditioning. Generated fresh from whatever's actually in a given day, so  */
+/* it stays accurate even if exercises get swapped later — never a fixed,  */
+/* one-size-fits-all routine baked into the program.                       */
+/* ---------------------------------------------------------------------- */
+const EXERCISE_CATEGORY_MAP = Object.fromEntries(EXERCISE_LIBRARY.map((e) => [e.name, e.category]));
+
+const WARMUP_RAISE = { name: "Jump Rope", sets: 1, reps: "2 min", reason: "Raises heart rate and core temperature before loading the body." };
+
+const WARMUP_LIBRARY = {
+  Chest: [
+    { name: "Arm Circles", sets: 1, reps: "20 each direction", reason: "Warms the shoulder joint for pressing work." },
+    { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Activates the rear delts and upper back to balance heavy pressing." },
+  ],
+  Shoulders: [
+    { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Preps the rotator cuff and rear delts for overhead work." },
+    { name: "Arm Circles", sets: 1, reps: "20 each direction", reason: "Mobilizes the shoulder joint through its full range." },
+  ],
+  Back: [
+    { name: "Cat-Cow", sets: 1, reps: "10", reason: "Mobilizes the spine before loaded hinging and rowing." },
+    { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Activates the mid-back before rowing movements." },
+  ],
+  Biceps: [
+    { name: "Arm Circles", sets: 1, reps: "15 each direction", reason: "Warms the elbow and shoulder before curling." },
+  ],
+  Triceps: [
+    { name: "Arm Circles", sets: 1, reps: "15 each direction", reason: "Warms the elbow joint before pressing and extension work." },
+  ],
+  Quads: [
+    { name: "Bodyweight Squat", sets: 2, reps: "10", reason: "Grooves the squat pattern and warms the knees before loading." },
+    { name: "Walking Lunge", sets: 1, reps: "10 each leg", reason: "Opens the hips and warms the quads for squatting." },
+  ],
+  Hamstrings: [
+    { name: "Leg Swings", sets: 1, reps: "10 each leg", reason: "Dynamically stretches the hamstrings before hinging." },
+    { name: "Glute Bridge", sets: 2, reps: "12", reason: "Activates the posterior chain before deadlifting." },
+  ],
+  Glutes: [
+    { name: "Glute Bridge", sets: 2, reps: "12", reason: "Activates the glutes before hip-dominant lifting." },
+    { name: "Hip Circles", sets: 1, reps: "10 each direction", reason: "Mobilizes the hips before squatting or hinging." },
+  ],
+  Calves: [
+    { name: "Ankle Circles", sets: 1, reps: "10 each direction", reason: "Preps ankle mobility for squatting and running." },
+  ],
+  Core: [
+    { name: "Dead Bug", sets: 2, reps: "10 each side", reason: "Activates the core before it's asked to stabilize heavy loads." },
+  ],
+  Forearms: [
+    { name: "Wrist Circles", sets: 1, reps: "10 each direction", reason: "Preps the wrists before gripping heavy loads." },
+  ],
+  "Full Body": [
+    { name: "Bear Crawl", sets: 1, reps: "20s", reason: "Raises heart rate and preps multiple joints at once." },
+  ],
+  Cardio: [
+    { name: "Jumping Jacks", sets: 1, reps: "30s", reason: "General raise to elevate heart rate before conditioning work." },
+  ],
+  Running: [
+    { name: "Leg Swings", sets: 1, reps: "10 each leg", reason: "Dynamically preps the hips before running." },
+    { name: "Ankle Circles", sets: 1, reps: "10 each direction", reason: "Preps the ankles for repeated impact." },
+  ],
+  "Combat Sports": [
+    { name: "Neck Bridge", sets: 1, reps: "5", reason: "Preps the neck before contact work." },
+    { name: "Hip Circles", sets: 1, reps: "10 each direction", reason: "Mobilizes the hips for grappling movement." },
+  ],
+};
+
+export function generateWarmup(exercises) {
+  const categoryCounts = {};
+  (exercises || []).forEach((ex) => {
+    const cat = EXERCISE_CATEGORY_MAP[ex.name];
+    if (cat) categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+  const topCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).map(([cat]) => cat);
+
+  const warmup = [WARMUP_RAISE];
+  const usedNames = new Set([WARMUP_RAISE.name]);
+  for (const cat of topCategories) {
+    const pool = WARMUP_LIBRARY[cat] || [];
+    const pick = pool.find((item) => !usedNames.has(item.name));
+    if (pick) {
+      warmup.push(pick);
+      usedNames.add(pick.name);
+    }
+    if (warmup.length >= 5) break;
+  }
+  return warmup;
+}
