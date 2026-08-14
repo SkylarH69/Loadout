@@ -2291,8 +2291,14 @@ export default function Loadout() {
   // normal and harmless, but we must NOT flip checkingProfile in that case, since that flag
   // gates a full-screen loading state that unmounts everything currently on screen, including
   // an in-progress workout. Only show that loading state on a genuine first load.
+  // hasFullyLoadedRef additionally stops this effect from re-fetching and overwriting
+  // profileRow at all once we already have a complete load for this user — without this,
+  // a routine token-refresh refetch can race a local edit (like toggling a schedule day)
+  // and silently revert it with stale server data.
+  const hasFullyLoadedRef = useRef(null);
   useEffect(() => {
     if (!session) return;
+    if (hasFullyLoadedRef.current === session.user.id) return;
     let cancelled = false;
     const isFirstLoad = !profileRow;
     if (isFirstLoad) setCheckingProfile(true);
@@ -2314,6 +2320,7 @@ export default function Loadout() {
       setWorkouts(w);
       setPrs(pr);
       setCommunityActivity(activity);
+      hasFullyLoadedRef.current = session.user.id;
 
       // Resume an in-progress workout if one was left running when the app closed.
       // Server-side draft is checked as one source, local storage as another —
@@ -2456,12 +2463,14 @@ export default function Loadout() {
     setProfileRow((prev) => ({ ...prev, deload_state: state }));
   };
 
-  const toggleScheduleDay = async (dayIdx) => {
-    const current = profileRow.weekly_schedule || defaultWeeklySchedule(userProgram.daysPerWeek || userProgram.days.length);
-    const next = [...current];
-    next[dayIdx] = !next[dayIdx];
-    setProfileRow((prev) => ({ ...prev, weekly_schedule: next }));
-    await setWeeklySchedule(session.user.id, next);
+  const toggleScheduleDay = (dayIdx) => {
+    setProfileRow((prev) => {
+      const current = prev.weekly_schedule || defaultWeeklySchedule(userProgram.daysPerWeek || userProgram.days.length);
+      const next = [...current];
+      next[dayIdx] = !next[dayIdx];
+      setWeeklySchedule(session.user.id, next).catch(() => {});
+      return { ...prev, weekly_schedule: next };
+    });
   };
 
   const signOut = async () => {
