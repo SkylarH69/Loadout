@@ -769,15 +769,13 @@ export function generateWarmup(exercises, dayName) {
   const warmup = [WARMUP_RAISE];
   const usedNames = new Set([WARMUP_RAISE.name]);
 
-  // Core bracing prep is on every single session, regardless of what's programmed —
-  // trunk bracing matters under a loaded bar no matter what you're training that day.
   const corePool = WARMUP_LIBRARY.Core;
   const coreItem = corePool[seed % corePool.length];
   warmup.push(coreItem);
   usedNames.add(coreItem.name);
 
   topCategories.forEach((cat, idx) => {
-    if (cat === "Core") return; // already guaranteed above
+    if (cat === "Core") return;
     const pool = WARMUP_LIBRARY[cat] || [];
     if (!pool.length) return;
     for (let offset = 0; offset < pool.length; offset++) {
@@ -791,4 +789,24 @@ export function generateWarmup(exercises, dayName) {
   });
 
   return warmup.slice(0, 6);
+}
+
+/* ---------------------------------------------------------------------- */
+/* DEFAULT WEEKLY SCHEDULE — sensible starting point based on published    */
+/* spacing conventions for each split length. Index 0 = Sunday ... 6 =     */
+/* Saturday. Fully editable afterward — this is just a starting point.     */
+/* ---------------------------------------------------------------------- */
+export function defaultWeeklySchedule(daysPerWeek) {
+  const patterns = {
+    2: [1, 4],
+    3: [1, 3, 5],
+    4: [1, 2, 4, 5],
+    5: [1, 2, 3, 4, 5],
+    6: [1, 2, 3, 4, 5, 6],
+    7: [0, 1, 2, 3, 4, 5, 6],
+  };
+  const days = patterns[daysPerWeek] || Array.from({ length: Math.min(daysPerWeek, 7) }, (_, i) => (i % 7) + 1);
+  const schedule = [false, false, false, false, false, false, false];
+  days.forEach((d) => { schedule[d % 7] = true; });
+  return schedule;
 }
