@@ -2468,7 +2468,9 @@ export default function Loadout() {
       const current = prev.weekly_schedule || defaultWeeklySchedule(userProgram.daysPerWeek || userProgram.days.length);
       const next = [...current];
       next[dayIdx] = !next[dayIdx];
-      setWeeklySchedule(session.user.id, next).catch(() => {});
+      setWeeklySchedule(session.user.id, next).catch((e) => {
+        alert(`Couldn't save your schedule change: ${e.message || "unknown error"}`);
+      });
       return { ...prev, weekly_schedule: next };
     });
   };
