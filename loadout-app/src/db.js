@@ -78,6 +78,10 @@ export async function setDeloadState(userId, state) {
   await supabase.from("profiles").update({ deload_state: state }).eq("id", userId);
 }
 
+export async function setWeeklySchedule(userId, schedule) {
+  await supabase.from("profiles").update({ weekly_schedule: schedule }).eq("id", userId);
+}
+
 export async function getActiveDraft(userId) {
   const { data } = await supabase.from("active_workout_draft").select("*").eq("user_id", userId).maybeSingle();
   if (!data) return null;
