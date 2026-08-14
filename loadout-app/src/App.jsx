@@ -1006,6 +1006,25 @@ function parseRepTarget(repsStr) {
   return null;
 }
 
+/* ---------------------------------------------------------------------- */
+/* RAMP-UP SETS — the "Potentiate" phase of RAMP: build up to today's       */
+/* working weight through ascending percentages rather than jumping        */
+/* straight to it cold. A widely used general practice across powerlifting */
+/* (not any one coach's proprietary numbers) — bar, then ~40/60/75/85%.    */
+/* ---------------------------------------------------------------------- */
+function generateRampSets(topWeight) {
+  if (!topWeight || topWeight <= 0) return [];
+  const bar = 45;
+  const round5 = (n) => Math.max(bar, Math.round(n / 5) * 5);
+  return [
+    { label: "Bar", weight: bar, reps: "8-10" },
+    { label: "40%", weight: round5(topWeight * 0.4), reps: "5" },
+    { label: "60%", weight: round5(topWeight * 0.6), reps: "3" },
+    { label: "75%", weight: round5(topWeight * 0.75), reps: "2" },
+    { label: "85%", weight: round5(topWeight * 0.85), reps: "1" },
+  ];
+}
+
 function suggestNextTarget(exerciseName, targetRepsStr, workouts) {
   for (let i = workouts.length - 1; i >= 0; i--) {
     if (workouts[i].isDeload) continue; // don't base normal progression off a lightened deload session
@@ -1140,7 +1159,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
   const [swapExerciseFor, setSwapExerciseFor] = useState(null); // exercise index being swapped mid-workout
-  const warmup = useMemo(() => generateWarmup(day.exercises), [day]);
+  const warmup = useMemo(() => generateWarmup(day.exercises, day.name), [day]);
   const [warmupOpen, setWarmupOpen] = useState(true);
   const [warmupDone, setWarmupDone] = useState(() => new Set());
   const toggleWarmupItem = (name) => {
@@ -1150,6 +1169,9 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       return next;
     });
   };
+  const rampCandidates = log
+    .map((ex, i) => ({ name: ex.name, weight: parseFloat(ex.sets[0]?.weight) }))
+    .filter(({ name, weight }) => classifyIncrement(name).type === "barbell" && weight > 0);
   const [phase, setPhase] = useState("log"); // 'log' | 'summary'
   const [rpe, setRpe] = useState(null);
   const [comment, setComment] = useState("");
@@ -1472,6 +1494,34 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                   </button>
                 );
               })}
+
+              {rampCandidates.length > 0 && (
+                <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 4, paddingTop: 14 }}>
+                  <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                    Ramp Into Your Working Weight
+                  </div>
+                  <div style={{ fontSize: 11.5, color: T.chalkDim, lineHeight: 1.4, marginBottom: 12 }}>
+                    Build up through these before your first working set — don't jump straight to today's weight cold.
+                  </div>
+                  {rampCandidates.map(({ name, weight }) => (
+                    <div key={name} style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, color: T.chalk, marginBottom: 6 }}>{name}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {generateRampSets(weight).map((s, i) => (
+                          <div key={i} style={{
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                            background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", minWidth: 52,
+                          }}>
+                            <span style={{ fontSize: 10, color: T.chalkDim }}>{s.label}</span>
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: T.chalk }}>{s.weight}</span>
+                            <span style={{ fontSize: 10, color: T.chalkDim }}>×{s.reps}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
