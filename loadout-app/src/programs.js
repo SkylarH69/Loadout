@@ -690,14 +690,17 @@ const WARMUP_LIBRARY = {
   Chest: [
     { name: "Arm Circles", sets: 1, reps: "20 each direction", reason: "Warms the shoulder joint for pressing work." },
     { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Activates the rear delts and upper back to balance heavy pressing." },
+    { name: "Scapular Push-Up", sets: 2, reps: "10", reason: "Wakes up the shoulder blades before pressing under load." },
   ],
   Shoulders: [
     { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Preps the rotator cuff and rear delts for overhead work." },
     { name: "Arm Circles", sets: 1, reps: "20 each direction", reason: "Mobilizes the shoulder joint through its full range." },
+    { name: "Wall Slide", sets: 2, reps: "10", reason: "Grooves overhead shoulder mechanics before loading." },
   ],
   Back: [
     { name: "Cat-Cow", sets: 1, reps: "10", reason: "Mobilizes the spine before loaded hinging and rowing." },
     { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Activates the mid-back before rowing movements." },
+    { name: "Scapular Retraction", sets: 2, reps: "12", reason: "Preps the lats and mid-back for pulling under load." },
   ],
   Biceps: [
     { name: "Arm Circles", sets: 1, reps: "15 each direction", reason: "Warms the elbow and shoulder before curling." },
@@ -708,20 +711,26 @@ const WARMUP_LIBRARY = {
   Quads: [
     { name: "Bodyweight Squat", sets: 2, reps: "10", reason: "Grooves the squat pattern and warms the knees before loading." },
     { name: "Walking Lunge", sets: 1, reps: "10 each leg", reason: "Opens the hips and warms the quads for squatting." },
+    { name: "Leg Swings", sets: 1, reps: "10 each leg", reason: "Dynamically opens the hips before squatting." },
   ],
   Hamstrings: [
     { name: "Leg Swings", sets: 1, reps: "10 each leg", reason: "Dynamically stretches the hamstrings before hinging." },
     { name: "Glute Bridge", sets: 2, reps: "12", reason: "Activates the posterior chain before deadlifting." },
+    { name: "World's Greatest Stretch", sets: 1, reps: "5 each side", reason: "Opens the hips and hamstrings through a full range before hinging." },
   ],
   Glutes: [
     { name: "Glute Bridge", sets: 2, reps: "12", reason: "Activates the glutes before hip-dominant lifting." },
     { name: "Hip Circles", sets: 1, reps: "10 each direction", reason: "Mobilizes the hips before squatting or hinging." },
+    { name: "Banded Lateral Walk", sets: 1, reps: "10 each direction", reason: "Fires up the glutes before heavy hip-driven work." },
   ],
   Calves: [
     { name: "Ankle Circles", sets: 1, reps: "10 each direction", reason: "Preps ankle mobility for squatting and running." },
   ],
   Core: [
-    { name: "Dead Bug", sets: 2, reps: "10 each side", reason: "Activates the core before it's asked to stabilize heavy loads." },
+    { name: "Dead Bug", sets: 2, reps: "10 each side", reason: "Trains the core to stay braced against movement before it has to do that under a loaded bar." },
+    { name: "Bird Dog", sets: 2, reps: "10 each side", reason: "Builds anti-rotation control the core will need to resist under load." },
+    { name: "Plank", sets: 2, reps: "30-45s", reason: "Grooves a braced, neutral trunk position before you have to hold one under weight." },
+    { name: "Pallof Press", sets: 2, reps: "10 each side", reason: "Anti-rotation activation — exactly the bracing pattern squats, presses, and pulls all demand." },
   ],
   Forearms: [
     { name: "Wrist Circles", sets: 1, reps: "10 each direction", reason: "Preps the wrists before gripping heavy loads." },
@@ -742,24 +751,44 @@ const WARMUP_LIBRARY = {
   ],
 };
 
-export function generateWarmup(exercises) {
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export function generateWarmup(exercises, dayName) {
   const categoryCounts = {};
   (exercises || []).forEach((ex) => {
     const cat = EXERCISE_CATEGORY_MAP[ex.name];
     if (cat) categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
   const topCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).map(([cat]) => cat);
+  const seed = hashStr(dayName || "");
 
   const warmup = [WARMUP_RAISE];
   const usedNames = new Set([WARMUP_RAISE.name]);
-  for (const cat of topCategories) {
+
+  // Core bracing prep is on every single session, regardless of what's programmed —
+  // trunk bracing matters under a loaded bar no matter what you're training that day.
+  const corePool = WARMUP_LIBRARY.Core;
+  const coreItem = corePool[seed % corePool.length];
+  warmup.push(coreItem);
+  usedNames.add(coreItem.name);
+
+  topCategories.forEach((cat, idx) => {
+    if (cat === "Core") return; // already guaranteed above
     const pool = WARMUP_LIBRARY[cat] || [];
-    const pick = pool.find((item) => !usedNames.has(item.name));
-    if (pick) {
-      warmup.push(pick);
-      usedNames.add(pick.name);
+    if (!pool.length) return;
+    for (let offset = 0; offset < pool.length; offset++) {
+      const candidate = pool[(seed + idx + offset) % pool.length];
+      if (!usedNames.has(candidate.name)) {
+        warmup.push(candidate);
+        usedNames.add(candidate.name);
+        break;
+      }
     }
-    if (warmup.length >= 5) break;
-  }
-  return warmup;
+  });
+
+  return warmup.slice(0, 6);
 }
