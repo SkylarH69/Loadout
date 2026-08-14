@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
-import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY, generateWarmup } from "./programs.js";
+import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY, generateWarmup, defaultWeeklySchedule } from "./programs.js";
 import { CARD, H2, P, TITLE, INPUT, BTN_PRIMARY, BTN_SECONDARY, ROUND_BTN } from "./styles.js";
 import {
   nextId, todayStr, daysAgo, formatDuration, computeStats, formatRelativeTime,
@@ -19,6 +19,7 @@ import {
   getWorkouts, insertWorkout, getPRs, upsertPR,
   getUserProgram, setUserProgram as setUserProgram_db,
   setDeloadState,
+  setWeeklySchedule,
   getActiveDraft, setActiveDraft, clearActiveDraft,
   getCommunityActivity, setCommunityActivity as setCommunityActivity_db,
   getChatMessages, sendChatMessage, deleteChatMessage, getProgramComments, sendProgramComment,
@@ -134,6 +135,58 @@ function Barbell({ percent }) {
       <div style={{ display: "flex" }}>{render([...arr].reverse())}</div>
       <div style={{ height: 6, background: "rgba(242,239,233,0.25)", flex: 1, minWidth: 40 }} />
       <div style={{ display: "flex" }}>{render(arr)}</div>
+    </div>
+  );
+}
+
+function WeekCalendar({ schedule, workouts, onToggleDay }) {
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const now = new Date();
+  const todayIdx = now.getDay();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - todayIdx);
+  const completedDates = new Set(workouts.map((w) => w.date));
+
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+      {dayLabels.map((label, i) => {
+        const dateObj = new Date(weekStart);
+        dateObj.setDate(weekStart.getDate() + i);
+        const dateStr = todayStr(dateObj);
+        const isTraining = schedule[i];
+        const isToday = i === todayIdx;
+        const isPast = i < todayIdx;
+        const completed = completedDates.has(dateStr);
+        const missed = isTraining && isPast && !completed;
+
+        let bg = "transparent";
+        let border = T.line;
+        let dot = null;
+        if (isTraining) {
+          if (completed) { bg = T.moss; border = T.moss; }
+          else if (missed) { bg = "transparent"; border = T.rust; }
+          else { bg = "transparent"; border = T.chalkDim; }
+        }
+
+        return (
+          <button
+            key={i}
+            onClick={() => onToggleDay(i)}
+            title={isTraining ? "Training day — tap to make a rest day" : "Rest day — tap to make a training day"}
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", flex: 1 }}
+          >
+            <span style={{ fontSize: 10.5, color: T.chalkDim }}>{label}</span>
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%", background: bg,
+              border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: isToday ? `0 0 0 2px ${T.brass}` : "none",
+            }}>
+              {completed && <Check size={13} color={T.iron} />}
+              {missed && <X size={12} color={T.rust} />}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -833,7 +886,7 @@ function getNextDayIndex(workouts, days) {
   return (lastIdx + 1) % days.length;
 }
 
-function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload }) {
+function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload, weeklySchedule, onToggleScheduleDay }) {
   const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
@@ -900,11 +953,14 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
       </div>
 
       <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5 }}>This week</div>
           <div style={{ color: T.chalkDim, fontSize: 13 }}>{stats.sessionsThisWeek} / {profile.program.daysPerWeek || profile.program.days.length} sessions</div>
         </div>
-        <Barbell percent={Math.min(100, (stats.sessionsThisWeek / (profile.program.daysPerWeek || profile.program.days.length)) * 100)} />
+        <WeekCalendar schedule={weeklySchedule} workouts={workouts} onToggleDay={onToggleScheduleDay} />
+        <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 10, lineHeight: 1.4 }}>
+          Tap any day to mark it a training or rest day — this adjusts to your real schedule, not just the textbook version.
+        </div>
       </div>
 
       <div style={{ ...CARD, marginBottom: 18 }}>
@@ -2400,6 +2456,14 @@ export default function Loadout() {
     setProfileRow((prev) => ({ ...prev, deload_state: state }));
   };
 
+  const toggleScheduleDay = async (dayIdx) => {
+    const current = profileRow.weekly_schedule || defaultWeeklySchedule(userProgram.daysPerWeek || userProgram.days.length);
+    const next = [...current];
+    next[dayIdx] = !next[dayIdx];
+    setProfileRow((prev) => ({ ...prev, weekly_schedule: next }));
+    await setWeeklySchedule(session.user.id, next);
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfileRow(null);
@@ -2460,6 +2524,7 @@ export default function Loadout() {
 
   const isTop = achievementIds.includes("rank-first");
   const deloadState = profileRow.deload_state || null;
+  const weeklySchedule = profileRow.weekly_schedule || defaultWeeklySchedule(profile.program.daysPerWeek || profile.program.days.length);
   const deloadSignal = !deloadState ? computeDeloadSignal(workouts, profile.program) : null;
   const currentToast = toastQueue[0] || null;
   const dismissToast = () => setToastQueue((q) => q.slice(1));
@@ -2482,6 +2547,8 @@ export default function Loadout() {
             deloadSignal={deloadSignal}
             deloadState={deloadState}
             onStartDeload={startDeload}
+            weeklySchedule={weeklySchedule}
+            onToggleScheduleDay={toggleScheduleDay}
           />
         )}
         {tab === "programs" && (
