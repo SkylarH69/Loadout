@@ -155,18 +155,12 @@ function WeekCalendar({ schedule, workouts, onToggleDay }) {
         const dateStr = todayStr(dateObj);
         const isTraining = schedule[i];
         const isToday = i === todayIdx;
-        const isPast = i < todayIdx;
         const completed = completedDates.has(dateStr);
-        const missed = isTraining && isPast && !completed;
 
         let bg = "transparent";
         let border = T.line;
-        let dot = null;
-        if (isTraining) {
-          if (completed) { bg = T.moss; border = T.moss; }
-          else if (missed) { bg = "transparent"; border = T.rust; }
-          else { bg = "transparent"; border = T.chalkDim; }
-        }
+        if (isTraining && completed) { bg = T.moss; border = T.moss; }
+        else if (isTraining) { border = T.chalkDim; }
 
         return (
           <button
@@ -181,8 +175,8 @@ function WeekCalendar({ schedule, workouts, onToggleDay }) {
               border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: isToday ? `0 0 0 2px ${T.brass}` : "none",
             }}>
-              {completed && <Check size={13} color={T.iron} />}
-              {missed && <X size={12} color={T.rust} />}
+              {isTraining && completed && <Check size={13} color={T.iron} />}
+              {!isTraining && <span style={{ fontSize: 11, color: T.chalk, fontWeight: 600 }}>R</span>}
             </div>
           </button>
         );
