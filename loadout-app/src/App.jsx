@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Dumbbell, Flame, Trophy, MessageCircle, Home, Plus, ChevronRight,
   ChevronLeft, Check, X, TrendingUp, Award, Send, Medal, Pencil,
@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
-import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY } from "./programs.js";
+import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY, generateWarmup } from "./programs.js";
 import { CARD, H2, P, TITLE, INPUT, BTN_PRIMARY, BTN_SECONDARY, ROUND_BTN } from "./styles.js";
 import {
   nextId, todayStr, daysAgo, formatDuration, computeStats, formatRelativeTime,
@@ -1140,6 +1140,16 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
   const [swapExerciseFor, setSwapExerciseFor] = useState(null); // exercise index being swapped mid-workout
+  const warmup = useMemo(() => generateWarmup(day.exercises), [day]);
+  const [warmupOpen, setWarmupOpen] = useState(true);
+  const [warmupDone, setWarmupDone] = useState(() => new Set());
+  const toggleWarmupItem = (name) => {
+    setWarmupDone((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
   const [phase, setPhase] = useState("log"); // 'log' | 'summary'
   const [rpe, setRpe] = useState(null);
   const [comment, setComment] = useState("");
@@ -1416,6 +1426,54 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         }}>
           <Sparkles size={15} style={{ flexShrink: 0 }} />
           Deload week — lighter weight, fewer sets, on purpose.
+        </div>
+      )}
+
+      {warmup.length > 0 && (
+        <div style={{ ...CARD, marginBottom: 18 }}>
+          <button
+            onClick={() => setWarmupOpen((o) => !o)}
+            style={{ background: "none", border: "none", padding: 0, width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Flame size={16} color={T.moss} />
+              <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>Warm-Up</span>
+              <span style={{ fontSize: 11, color: T.chalkDim }}>({warmupDone.size}/{warmup.length})</span>
+            </div>
+            {warmupOpen ? <ChevronLeft size={16} color={T.chalkDim} style={{ transform: "rotate(-90deg)" }} /> : <ChevronRight size={16} color={T.chalkDim} />}
+          </button>
+          {warmupOpen && (
+            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ fontSize: 11.5, color: T.chalkDim, lineHeight: 1.4 }}>
+                Built for today's session specifically — raises your heart rate, then mobilizes and activates what you're about to train.
+              </div>
+              {warmup.map((item) => {
+                const done = warmupDone.has(item.name);
+                return (
+                  <button
+                    key={item.name}
+                    onClick={() => toggleWarmupItem(item.name)}
+                    style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+                  >
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                      border: `1.5px solid ${done ? T.moss : T.line}`, background: done ? T.moss : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {done && <Check size={12} color={T.iron} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 13.5, color: done ? T.chalkDim : T.chalk, textDecoration: done ? "line-through" : "none" }}>{item.name}</span>
+                        <span style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{item.sets}×{item.reps}</span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: T.chalkDim, marginTop: 2, lineHeight: 1.35 }}>{item.reason}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
