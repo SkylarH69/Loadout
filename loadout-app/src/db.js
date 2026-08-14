@@ -79,7 +79,8 @@ export async function setDeloadState(userId, state) {
 }
 
 export async function setWeeklySchedule(userId, schedule) {
-  await supabase.from("profiles").update({ weekly_schedule: schedule }).eq("id", userId);
+  const { error } = await supabase.from("profiles").update({ weekly_schedule: schedule }).eq("id", userId);
+  if (error) throw error;
 }
 
 export async function getActiveDraft(userId) {
