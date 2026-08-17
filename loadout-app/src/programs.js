@@ -757,6 +757,50 @@ function hashStr(s) {
   return Math.abs(h);
 }
 
+/* Lift-specific warmup pools — these target the EXACT movement pattern a       */
+/* given exercise demands (horizontal press vs. vertical press vs. row vs.      */
+/* vertical pull), rather than just "shoulders" broadly. This is what makes     */
+/* Bench Press day warm up differently from Overhead Press day, even though     */
+/* both are nominally "shoulder" or "chest" work.                               */
+const MOVEMENT_WARMUPS = {
+  horizontalPress: [
+    { name: "Scapular Push-Up", sets: 2, reps: "10", reason: "Grooves shoulder blade control specific to pressing horizontally under load." },
+    { name: "Push-Up", sets: 1, reps: "10", reason: "Rehearses the actual bench pressing pattern at bodyweight before adding load." },
+    { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Balances the shoulder before heavy horizontal pressing." },
+  ],
+  verticalPress: [
+    { name: "Wall Slide", sets: 2, reps: "10", reason: "Grooves the overhead shoulder mechanics this exact lift demands." },
+    { name: "Pike Push-Up", sets: 1, reps: "8", reason: "Rehearses the overhead pressing pattern at bodyweight before adding load." },
+    { name: "Arm Circles", sets: 1, reps: "20 each direction", reason: "Opens the shoulder through the range overhead pressing needs." },
+  ],
+  horizontalPull: [
+    { name: "Scapular Retraction", sets: 2, reps: "12", reason: "Preps the mid-back to retract under load, specific to rowing." },
+    { name: "Band Pull-Apart", sets: 2, reps: "15", reason: "Activates the exact muscles this rowing movement relies on." },
+  ],
+  verticalPull: [
+    { name: "Dead Hang", sets: 1, reps: "20-30s", reason: "Preps the grip and lats for pulling your bodyweight from overhead." },
+    { name: "Scapular Retraction", sets: 2, reps: "12", reason: "Grooves the shoulder blade engagement pull-ups and pulldowns need before adding load." },
+  ],
+};
+
+function detectMovementPatterns(exercises) {
+  const patterns = new Set();
+  (exercises || []).forEach((ex) => {
+    const n = ex.name;
+    if (/pulldown|pull-up|chin-up|towel pull-up/i.test(n)) {
+      patterns.add("verticalPull");
+    } else if (/row/i.test(n)) {
+      patterns.add("horizontalPull");
+    }
+    if (/overhead press|shoulder press|push press|arnold press|handstand push|pike push|landmine press|bradford/i.test(n)) {
+      patterns.add("verticalPress");
+    } else if (/bench press|floor press|chest press|incline.*press|decline.*press|svend press|guillotine press/i.test(n)) {
+      patterns.add("horizontalPress");
+    }
+  });
+  return patterns;
+}
+
 export function generateWarmup(exercises, dayName) {
   const categoryCounts = {};
   (exercises || []).forEach((ex) => {
@@ -765,17 +809,41 @@ export function generateWarmup(exercises, dayName) {
   });
   const topCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).map(([cat]) => cat);
   const seed = hashStr(dayName || "");
+  const patterns = detectMovementPatterns(exercises);
 
   const warmup = [WARMUP_RAISE];
   const usedNames = new Set([WARMUP_RAISE.name]);
 
+  // Core bracing prep is on every single session, regardless of what's programmed —
+  // trunk bracing matters under a loaded bar no matter what you're training that day.
   const corePool = WARMUP_LIBRARY.Core;
   const coreItem = corePool[seed % corePool.length];
   warmup.push(coreItem);
   usedNames.add(coreItem.name);
 
+  // Lift-specific patterns take priority over generic category picks for upper body —
+  // this is what makes Bench day and Overhead Press day warm up differently.
+  const patternOrder = ["horizontalPress", "verticalPress", "horizontalPull", "verticalPull"];
+  const coveredCategories = new Set();
+  patternOrder.forEach((p) => {
+    if (!patterns.has(p)) return;
+    if (p === "horizontalPress") coveredCategories.add("Chest");
+    if (p === "verticalPress") coveredCategories.add("Shoulders");
+    if (p === "horizontalPull" || p === "verticalPull") coveredCategories.add("Back");
+    const pool = MOVEMENT_WARMUPS[p];
+    const patternSeed = hashStr((dayName || "") + p);
+    for (let offset = 0; offset < pool.length; offset++) {
+      const candidate = pool[(patternSeed + offset) % pool.length];
+      if (!usedNames.has(candidate.name)) {
+        warmup.push(candidate);
+        usedNames.add(candidate.name);
+        break;
+      }
+    }
+  });
+
   topCategories.forEach((cat, idx) => {
-    if (cat === "Core") return;
+    if (cat === "Core" || coveredCategories.has(cat)) return; // already guaranteed or covered by a lift-specific pick
     const pool = WARMUP_LIBRARY[cat] || [];
     if (!pool.length) return;
     for (let offset = 0; offset < pool.length; offset++) {
@@ -798,11 +866,11 @@ export function generateWarmup(exercises, dayName) {
 /* ---------------------------------------------------------------------- */
 export function defaultWeeklySchedule(daysPerWeek) {
   const patterns = {
-    2: [1, 4],
-    3: [1, 3, 5],
-    4: [1, 2, 4, 5],
-    5: [1, 2, 3, 4, 5],
-    6: [1, 2, 3, 4, 5, 6],
+    2: [1, 4],                 // Mon, Thu
+    3: [1, 3, 5],               // Mon, Wed, Fri
+    4: [1, 2, 4, 5],             // Mon, Tue, rest, Thu, Fri, rest, rest — 2 on / 1 off / 2 on / 2 off
+    5: [1, 2, 3, 4, 5],           // Mon–Fri
+    6: [1, 2, 3, 4, 5, 6],         // Mon–Sat
     7: [0, 1, 2, 3, 4, 5, 6],
   };
   const days = patterns[daysPerWeek] || Array.from({ length: Math.min(daysPerWeek, 7) }, (_, i) => (i % 7) + 1);
