@@ -2216,19 +2216,51 @@ function Nav({ tab, setTab }) {
     </div>
   );
 }
-function FinishBanner({ data, onClose }) {
+function FinishBanner({ data, onClose, onShare }) {
+  const [shareState, setShareState] = useState("idle"); // 'idle' | 'sharing' | 'shared' | 'error'
+
+  const handleShare = async () => {
+    if (shareState === "sharing" || shareState === "shared") return;
+    setShareState("sharing");
+    try {
+      await onShare(data);
+      setShareState("shared");
+    } catch (e) {
+      setShareState("error");
+    }
+  };
+
   return (
     <div style={{
       margin: "18px 18px 0", padding: "14px 16px", borderRadius: 12, background: "rgba(143,184,155,0.14)",
-      border: `1px solid ${T.moss}`, display: "flex", alignItems: "center", gap: 10,
+      border: `1px solid ${T.moss}`,
     }}>
-      <Check size={18} color={T.moss} />
-      <div style={{ flex: 1, fontSize: 13.5, color: T.chalk }}>
-        Workout logged — {data.durationSeconds ? `${formatDuration(data.durationSeconds)} · ` : ""}{Math.round(data.volume).toLocaleString()} lb moved{data.gotPR ? ". New PR set! 🏆" : "."}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Check size={18} color={T.moss} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, fontSize: 13.5, color: T.chalk }}>
+          Workout logged — {data.durationSeconds ? `${formatDuration(data.durationSeconds)} · ` : ""}{Math.round(data.volume).toLocaleString()} lb moved{data.gotPR ? ". New PR set! 🏆" : "."}
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", flexShrink: 0 }}>
+          <X size={16} />
+        </button>
       </div>
-      <button onClick={onClose} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer" }}>
-        <X size={16} />
-      </button>
+      {onShare && (
+        <button
+          onClick={handleShare}
+          disabled={shareState === "sharing" || shareState === "shared"}
+          style={{
+            marginTop: 10, background: "none", border: `1px solid ${shareState === "shared" ? T.moss : T.line}`,
+            borderRadius: 8, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6,
+            color: shareState === "shared" ? T.moss : T.chalk, fontSize: 12.5, cursor: shareState === "idle" ? "pointer" : "default",
+          }}
+        >
+          <MessageCircle size={13} />
+          {shareState === "idle" && "Share to Gym Floor"}
+          {shareState === "sharing" && "Sharing…"}
+          {shareState === "shared" && "Shared to Gym Floor ✓"}
+          {shareState === "error" && "Couldn't share — try again"}
+        </button>
+      )}
     </div>
   );
 }
@@ -2449,11 +2481,13 @@ export default function Loadout() {
 
     const newPrs = { ...prs };
     let gotPR = false;
+    const prDetails = [];
     for (const ex of result.exercises) {
       const maxW = Math.max(...ex.sets.map((s) => s.weight));
       if (!newPrs[ex.name] || maxW > newPrs[ex.name].weight) {
         newPrs[ex.name] = { weight: maxW, date: todayStr() };
         gotPR = true;
+        prDetails.push({ name: ex.name, weight: maxW });
         await upsertPR(session.user.id, ex.name, maxW, todayStr());
       }
     }
@@ -2462,7 +2496,7 @@ export default function Loadout() {
     const s = computeStats(newWorkouts);
     await updatePublicSnapshot(session.user.id, { currentStreak: s.streak, volume30: s.volume30, achievementIds, prsCount: Object.keys(newPrs).length });
     setLbRefresh((x) => x + 1);
-    setJustFinished({ volume: result.volume, durationSeconds: result.durationSeconds, gotPR });
+    setJustFinished({ volume: result.volume, durationSeconds: result.durationSeconds, gotPR, prDetails, dayName: result.dayName });
     setActiveDayIdx(null);
     setTab("dashboard");
 
@@ -2480,6 +2514,19 @@ export default function Loadout() {
     const state = { startedAt: Date.now(), doneDayNames: [] };
     await setDeloadState(session.user.id, state);
     setProfileRow((prev) => ({ ...prev, deload_state: state }));
+  };
+
+  const shareWorkoutToChat = async (data) => {
+    const prText = data.prDetails && data.prDetails.length
+      ? ` New PR${data.prDetails.length > 1 ? "s" : ""}: ${data.prDetails.map((p) => `${p.name} ${p.weight} lb`).join(", ")}!`
+      : "";
+    const text = `Finished ${data.dayName || "a workout"} — ${data.durationSeconds ? formatDuration(data.durationSeconds) : "?"} · ${Math.round(data.volume).toLocaleString()} lb moved.${prText}`;
+    const isTop = achievementIds.includes("rank-first");
+    await sendChatMessage(session.user.id, { name: profile.name, text, streak: stats.streak, achievementCount: achievementIds.length, isTop });
+    const activity = await getCommunityActivity(session.user.id);
+    activity.chatCount = (activity.chatCount || 0) + 1;
+    await setCommunityActivity_db(session.user.id, activity);
+    setCommunityActivity(activity);
   };
 
   const toggleScheduleDay = (dayIdx) => {
@@ -2563,7 +2610,7 @@ export default function Loadout() {
     <Shell>
       {currentToast && <AchievementToast achievement={currentToast} onDismiss={dismissToast} />}
       <div style={{ flex: 1, overflowY: tab === "chat" ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
-        {justFinished && tab === "dashboard" && <FinishBanner data={justFinished} onClose={() => setJustFinished(null)} />}
+        {justFinished && tab === "dashboard" && <FinishBanner data={justFinished} onClose={() => setJustFinished(null)} onShare={shareWorkoutToChat} />}
         {tab === "dashboard" && (
           <Dashboard
             profile={profile}
