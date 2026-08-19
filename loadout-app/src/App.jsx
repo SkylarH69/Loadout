@@ -1209,7 +1209,7 @@ function suggestDeloadTarget(exerciseName, targetRepsStr, workouts) {
   return { weight: null, reps: null, note: "Deload week — keep today light and easy." };
 }
 
-function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadActive, onCancel, onFinish, prs }) {
+function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadActive, onCancel, onFinish, onShare, prs }) {
   const [log, setLog] = useState(
     initialDraft?.log ||
       day.exercises.map((ex) => {
@@ -1433,6 +1433,15 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 
   if (phase === "summary") {
     const totalSets = log.reduce((sum, ex) => sum + ex.sets.filter((s) => s.weight !== "" && s.reps !== "").length, 0);
+    const prDetails = log.reduce((acc, ex) => {
+      const weights = ex.sets.filter((s) => s.weight !== "" && s.reps !== "").map((s) => parseFloat(s.weight));
+      if (weights.length === 0) return acc;
+      const maxW = Math.max(...weights);
+      const existing = prs[ex.name]?.weight;
+      if (!existing || maxW > existing) acc.push({ name: ex.name, weight: maxW });
+      return acc;
+    }, []);
+
     return (
       <div style={{ padding: "20px 18px 110px" }}>
         <button onClick={() => setPhase("log")} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
@@ -1442,10 +1451,17 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         <h1 style={{ ...TITLE, marginBottom: 4 }}>Workout Complete</h1>
         <p style={{ ...P, marginTop: 6 }}>{day.name}</p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
           <StatCard icon={<Clock size={18} color={T.moss} />} label="Duration" value={formatDuration(elapsed)} />
           <StatCard icon={<TrendingUp size={18} color={T.rust} />} label="Volume" value={`${Math.round(totalVolume).toLocaleString()} lb`} />
         </div>
+
+        {onShare && (
+          <WorkoutShareButton
+            onShare={onShare}
+            data={{ dayName: day.name, durationSeconds: elapsed, volume: totalVolume, prDetails }}
+          />
+        )}
 
         <div style={{ ...CARD, marginBottom: 18, display: "flex", justifyContent: "space-between" }}>
           <div style={{ fontSize: 13, color: T.chalkDim }}>Exercises</div>
@@ -2068,13 +2084,51 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                     </button>
                   )}
                 </div>
-                <div style={{
-                  background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 14,
-                  borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
-                  fontSize: 14, lineHeight: 1.4, wordBreak: "break-word",
-                }}>
-                  {m.text}
-                </div>
+                {m.workoutSnapshot ? (
+                  <div style={{
+                    background: `linear-gradient(135deg, rgba(232,185,74,0.12), rgba(196,67,43,0.08))`,
+                    border: `1px solid ${T.brass}`, borderRadius: 14,
+                    borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
+                    padding: "12px 14px", minWidth: 200,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                      <Dumbbell size={14} color={T.brass} />
+                      <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13.5, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        {m.workoutSnapshot.dayName}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 14 }}>
+                      <div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.chalk }}>
+                          {formatDuration(m.workoutSnapshot.durationSeconds)}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 0.3 }}>Time</div>
+                      </div>
+                      <div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.chalk }}>
+                          {Math.round(m.workoutSnapshot.volume).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 0.3 }}>Lb Moved</div>
+                      </div>
+                      {m.workoutSnapshot.prCount > 0 && (
+                        <div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.brass }}>
+                            {m.workoutSnapshot.prCount}
+                          </div>
+                          <div style={{ fontSize: 9.5, color: T.brass, textTransform: "uppercase", letterSpacing: 0.3 }}>PR{m.workoutSnapshot.prCount > 1 ? "s" : ""}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 14,
+                    borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
+                    fontSize: 14, lineHeight: 1.4, wordBreak: "break-word",
+                  }}>
+                    {m.text}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -2224,6 +2278,40 @@ function Nav({ tab, setTab }) {
     </div>
   );
 }
+function WorkoutShareButton({ data, onShare }) {
+  const [shareState, setShareState] = useState("idle"); // 'idle' | 'sharing' | 'shared' | 'error'
+
+  const handleShare = async () => {
+    if (shareState === "sharing" || shareState === "shared") return;
+    setShareState("sharing");
+    try {
+      await onShare(data);
+      setShareState("shared");
+    } catch {
+      setShareState("error");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      disabled={shareState === "sharing" || shareState === "shared"}
+      style={{
+        ...BTN_SECONDARY, marginBottom: 18,
+        borderColor: shareState === "shared" ? T.moss : T.line,
+        color: shareState === "shared" ? T.moss : T.chalk,
+        cursor: shareState === "idle" ? "pointer" : "default",
+      }}
+    >
+      <MessageCircle size={15} style={{ marginRight: 8 }} />
+      {shareState === "idle" && "Share to Gym Floor"}
+      {shareState === "sharing" && "Sharing…"}
+      {shareState === "shared" && "Shared to Gym Floor ✓"}
+      {shareState === "error" && "Couldn't share — try again"}
+    </button>
+  );
+}
+
 function FinishBanner({ data, onClose, onShare }) {
   const [shareState, setShareState] = useState("idle"); // 'idle' | 'sharing' | 'shared' | 'error'
 
@@ -2530,7 +2618,13 @@ export default function Loadout() {
       : "";
     const text = `Finished ${data.dayName || "a workout"} — ${data.durationSeconds ? formatDuration(data.durationSeconds) : "?"} · ${Math.round(data.volume).toLocaleString()} lb moved.${prText}`;
     const isTop = achievementIds.includes("rank-first");
-    await sendChatMessage(session.user.id, { name: profile.name, text, streak: stats.streak, achievementCount: achievementIds.length, isTop });
+    const workoutSnapshot = {
+      dayName: data.dayName || "Workout",
+      durationSeconds: data.durationSeconds || 0,
+      volume: data.volume || 0,
+      prCount: data.prDetails ? data.prDetails.length : 0,
+    };
+    await sendChatMessage(session.user.id, { name: profile.name, text, streak: stats.streak, achievementCount: achievementIds.length, isTop, workoutSnapshot });
     const activity = await getCommunityActivity(session.user.id);
     activity.chatCount = (activity.chatCount || 0) + 1;
     await setCommunityActivity_db(session.user.id, activity);
@@ -2666,6 +2760,7 @@ export default function Loadout() {
             prs={prs}
             onCancel={() => { setActiveDayIdx(null); setTab("programs"); setResumeDraft(null); }}
             onFinish={finishWorkout}
+            onShare={shareWorkoutToChat}
           />
         )}
         {tab === "leaderboard" && <Leaderboard myName={profile.name} refreshKey={lbRefresh} onOpenProfile={setViewingProfile} />}
