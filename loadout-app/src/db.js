@@ -191,6 +191,7 @@ export async function getChatMessages() {
     streak: m.streak,
     achievementCount: m.achievement_count,
     isTop: m.is_top,
+    workoutSnapshot: m.workout_snapshot || null,
   }));
 }
 
@@ -202,6 +203,7 @@ export async function sendChatMessage(userId, msg) {
     streak: msg.streak,
     achievement_count: msg.achievementCount,
     is_top: msg.isTop,
+    workout_snapshot: msg.workoutSnapshot || null,
   });
   if (error) throw error;
 }
