@@ -1391,6 +1391,14 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   const totalVolume = log.reduce(
     (sum, ex) => sum + ex.sets.reduce((s, set) => s + (parseFloat(set.weight) || 0) * (parseFloat(set.reps) || 0), 0), 0
   );
+  // Live counter shown while actively logging — only counts sets you've confirmed,
+  // so prefilled suggested targets don't make it look like the workout already
+  // has volume before you've done anything. The actual saved total (above) is
+  // untouched and still includes any set with real numbers, confirmed or not,
+  // so nothing you actually do is ever lost just because you forgot to tap confirm.
+  const confirmedVolume = log.reduce(
+    (sum, ex) => sum + ex.sets.reduce((s, set) => s + (set.confirmed ? (parseFloat(set.weight) || 0) * (parseFloat(set.reps) || 0) : 0), 0), 0
+  );
 
   const goToSummary = () => {
     const hasAnySet = log.some((ex) => ex.sets.some((s) => s.weight !== "" && s.reps !== ""));
@@ -1501,7 +1509,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         <button onClick={() => { clearDraft(); onCancel(); }} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
           <ChevronLeft size={18} /> Cancel
         </button>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.rust, fontSize: 13 }}>{Math.round(totalVolume).toLocaleString()} lb total</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.rust, fontSize: 13 }}>{Math.round(confirmedVolume).toLocaleString()} lb confirmed</div>
       </div>
 
       <div style={{
