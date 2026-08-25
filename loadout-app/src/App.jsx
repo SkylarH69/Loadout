@@ -3,7 +3,7 @@ import {
   Dumbbell, Flame, Trophy, MessageCircle, Home, Plus, ChevronRight,
   ChevronLeft, Check, X, TrendingUp, Award, Send, Medal, Pencil,
   ArrowLeft, MessageSquare, Layers, Heart, Users, ShieldCheck, ExternalLink,
-  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat
+  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat, Link2
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
@@ -384,7 +384,7 @@ function ensureIds(days) {
 
 function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }) {
   const [days, setDays] = useState(() => ensureIds(initialDays || sourceProgram.days));
-  const [pickerFor, setPickerFor] = useState(null);
+  const [addFlow, setAddFlow] = useState(null); // { dayId, stage: 'picking'|'prompt', supersetId, lastExerciseId }
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
   const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
@@ -406,11 +406,36 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
     }));
   };
 
-  const addExercise = (dayId, name) => {
+  const addExercise = (dayId, name, supersetId) => {
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
-      ...d, exercises: [...d.exercises, { id: nextId(), name, sets: 3, reps: "8-10" }],
+      ...d, exercises: [...d.exercises, { id: nextId(), name, sets: 3, reps: "8-10", supersetId: supersetId || null }],
     }));
   };
+
+  // Superset add flow — chainable: after each pick, offer to add another partner.
+  const startAddExercise = (dayId) => setAddFlow({ dayId, stage: "picking", supersetId: null, lastExerciseId: null });
+
+  const handlePicked = (name) => {
+    const newExId = nextId();
+    setDays((prev) => prev.map((d) => d.id !== addFlow.dayId ? d : {
+      ...d, exercises: [...d.exercises, { id: newExId, name, sets: 3, reps: "8-10", supersetId: addFlow.supersetId }],
+    }));
+    setAddFlow({ ...addFlow, stage: "prompt", lastExerciseId: newExId });
+  };
+
+  const addSupersetPartner = () => {
+    let supersetId = addFlow.supersetId;
+    if (!supersetId) {
+      supersetId = nextId();
+      const dayId = addFlow.dayId, lastExerciseId = addFlow.lastExerciseId;
+      setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
+        ...d, exercises: d.exercises.map((e) => e.id === lastExerciseId ? { ...e, supersetId } : e),
+      }));
+    }
+    setAddFlow({ ...addFlow, stage: "picking", supersetId });
+  };
+
+  const finishAddFlow = () => setAddFlow(null);
 
   const renameDay = (dayId, name) => {
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : { ...d, name }));
@@ -430,6 +455,87 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
   };
 
   const visibleDays = focusDayId && !showAllDays ? days.filter((d) => d.id === focusDayId) : days;
+
+  const renderExerciseRow = (day, ex) => {
+    const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
+    return (
+      <div key={ex.id}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <input
+            value={ex.name}
+            onChange={(e) => updateExercise(day.id, ex.id, "name", e.target.value)}
+            style={{ ...INPUT, flex: 1, padding: "10px 12px", fontSize: 13.5 }}
+          />
+          <button
+            onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
+            title="Replace this exercise"
+            style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+          >
+            <Repeat size={16} />
+          </button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+              <ChevronLeft size={13} />
+            </button>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+              {ex.sets}
+            </span>
+            <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+              <ChevronRight size={13} />
+            </button>
+          </div>
+          <input
+            value={ex.reps}
+            onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
+            placeholder="reps"
+            style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
+          />
+          <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
+            <X size={16} />
+          </button>
+        </div>
+        {isSwapping && (
+          <ExercisePicker
+            onAdd={(name) => { updateExercise(day.id, ex.id, "name", name); setSwapFor(null); }}
+            onClose={() => setSwapFor(null)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderExerciseList = (day) => {
+    const elements = [];
+    let i = 0;
+    while (i < day.exercises.length) {
+      const ex = day.exercises[i];
+      if (ex.supersetId) {
+        const group = [];
+        let j = i;
+        while (j < day.exercises.length && day.exercises[j].supersetId === ex.supersetId) {
+          group.push(day.exercises[j]);
+          j++;
+        }
+        elements.push(
+          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 10, padding: "10px 10px 2px", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, color: T.brass, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              <Link2 size={12} /> Superset — {group.length} exercises back-to-back
+            </div>
+            {group.map((gex) => (
+              <div key={gex.id} style={{ marginBottom: 10 }}>{renderExerciseRow(day, gex)}</div>
+            ))}
+          </div>
+        );
+        i = j;
+      } else {
+        elements.push(<div key={ex.id} style={{ marginBottom: 12 }}>{renderExerciseRow(day, ex)}</div>);
+        i++;
+      }
+    }
+    return elements;
+  };
 
   return (
     <div style={{ padding: "20px 18px 110px" }}>
@@ -455,68 +561,31 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
               padding: "0 0 8px", marginBottom: 14, width: "100%", outline: "none",
             }}
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {day.exercises.map((ex) => {
-              const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
-              return (
-                <div key={ex.id}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <input
-                      value={ex.name}
-                      onChange={(e) => updateExercise(day.id, ex.id, "name", e.target.value)}
-                      style={{ ...INPUT, flex: 1, padding: "10px 12px", fontSize: 13.5 }}
-                    />
-                    <button
-                      onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
-                      title="Replace this exercise"
-                      style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      <Repeat size={16} />
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                        <ChevronLeft size={13} />
-                      </button>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
-                        {ex.sets}
-                      </span>
-                      <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
-                    <input
-                      value={ex.reps}
-                      onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
-                      placeholder="reps"
-                      style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
-                    />
-                    <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {isSwapping && (
-                    <ExercisePicker
-                      onAdd={(name) => { updateExercise(day.id, ex.id, "name", name); setSwapFor(null); }}
-                      onClose={() => setSwapFor(null)}
-                    />
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {renderExerciseList(day)}
           </div>
 
-          {pickerFor === day.id ? (
-            <ExercisePicker
-              onAdd={(name) => { addExercise(day.id, name); setPickerFor(null); }}
-              onClose={() => setPickerFor(null)}
-            />
-          ) : (
-            <button onClick={() => setPickerFor(day.id)} style={{ ...BTN_SECONDARY, marginTop: 12, padding: "8px 12px", fontSize: 13, width: "auto" }}>
+          {addFlow && addFlow.dayId === day.id && addFlow.stage === "picking" && (
+            <ExercisePicker onAdd={handlePicked} onClose={finishAddFlow} />
+          )}
+          {addFlow && addFlow.dayId === day.id && addFlow.stage === "prompt" && (
+            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 12.5, color: T.chalk, marginBottom: 10 }}>Superset this with another exercise?</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={addSupersetPartner} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto", borderColor: T.brass, color: T.brass }}>
+                  <Link2 size={13} style={{ marginRight: 6 }} /> Add Partner
+                </button>
+                <button onClick={finishAddFlow} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto" }}>
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+          {!addFlow || addFlow.dayId !== day.id ? (
+            <button onClick={() => startAddExercise(day.id)} style={{ ...BTN_SECONDARY, marginTop: 12, padding: "8px 12px", fontSize: 13, width: "auto" }}>
               <Plus size={14} style={{ marginRight: 4 }} /> Add exercise
             </button>
-          )}
+          ) : null}
         </div>
       ))}
 
@@ -535,7 +604,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
   const [days, setDays] = useState(() =>
     initialDays && initialDays.length ? ensureIds(initialDays) : [{ id: nextId(), name: "Day 1", exercises: [] }]
   );
-  const [pickerFor, setPickerFor] = useState(null);
+  const [addFlow, setAddFlow] = useState(null); // { dayId, stage: 'picking'|'prompt', supersetId, lastExerciseId }
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
   const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
@@ -551,11 +620,30 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
     setDays((prev) => prev.map((d) => (d.id !== dayId ? d : { ...d, name: dayName })));
   };
 
-  const addExercise = (dayId, exName) => {
-    setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
-      ...d, exercises: [...d.exercises, { id: nextId(), name: exName, sets: 3, reps: "8-10" }],
+  // Superset add flow — chainable: after each pick, offer to add another partner.
+  const startAddExercise = (dayId) => setAddFlow({ dayId, stage: "picking", supersetId: null, lastExerciseId: null });
+
+  const handlePicked = (exName) => {
+    const newExId = nextId();
+    setDays((prev) => prev.map((d) => d.id !== addFlow.dayId ? d : {
+      ...d, exercises: [...d.exercises, { id: newExId, name: exName, sets: 3, reps: "8-10", supersetId: addFlow.supersetId }],
     }));
+    setAddFlow({ ...addFlow, stage: "prompt", lastExerciseId: newExId });
   };
+
+  const addSupersetPartner = () => {
+    let supersetId = addFlow.supersetId;
+    if (!supersetId) {
+      supersetId = nextId();
+      const dayId = addFlow.dayId, lastExerciseId = addFlow.lastExerciseId;
+      setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
+        ...d, exercises: d.exercises.map((e) => e.id === lastExerciseId ? { ...e, supersetId } : e),
+      }));
+    }
+    setAddFlow({ ...addFlow, stage: "picking", supersetId });
+  };
+
+  const finishAddFlow = () => setAddFlow(null);
 
   const updateExercise = (dayId, exId, field, value) => {
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : {
@@ -588,6 +676,85 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
       daysPerWeek: cleaned.length,
       days: cleaned,
     });
+  };
+
+  const renderExerciseRow = (day, ex) => {
+    const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
+    return (
+      <div key={ex.id}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 10, border: `1.5px solid ${T.line}` }}>
+            {ex.name}
+          </div>
+          <button
+            onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
+            title="Replace this exercise"
+            style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+          >
+            <Repeat size={16} />
+          </button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+              <ChevronLeft size={13} />
+            </button>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+              {ex.sets}
+            </span>
+            <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
+              <ChevronRight size={13} />
+            </button>
+          </div>
+          <input
+            value={ex.reps}
+            onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
+            placeholder="reps"
+            style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
+          />
+          <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
+            <X size={16} />
+          </button>
+        </div>
+        {isSwapping && (
+          <ExercisePicker
+            onAdd={(exName) => { updateExercise(day.id, ex.id, "name", exName); setSwapFor(null); }}
+            onClose={() => setSwapFor(null)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderExerciseList = (day) => {
+    const elements = [];
+    let i = 0;
+    while (i < day.exercises.length) {
+      const ex = day.exercises[i];
+      if (ex.supersetId) {
+        const group = [];
+        let j = i;
+        while (j < day.exercises.length && day.exercises[j].supersetId === ex.supersetId) {
+          group.push(day.exercises[j]);
+          j++;
+        }
+        elements.push(
+          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 10, padding: "10px 10px 2px", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, color: T.brass, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              <Link2 size={12} /> Superset — {group.length} exercises back-to-back
+            </div>
+            {group.map((gex) => (
+              <div key={gex.id} style={{ marginBottom: 10 }}>{renderExerciseRow(day, gex)}</div>
+            ))}
+          </div>
+        );
+        i = j;
+      } else {
+        elements.push(<div key={ex.id} style={{ marginBottom: 12 }}>{renderExerciseRow(day, ex)}</div>);
+        i++;
+      }
+    }
+    return elements;
   };
 
   return (
@@ -661,66 +828,31 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
             <div style={{ fontSize: 12.5, color: T.chalkDim, marginBottom: 12 }}>No exercises yet — search below to add some.</div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {day.exercises.map((ex) => {
-              const isSwapping = swapFor && swapFor.dayId === day.id && swapFor.exId === ex.id;
-              return (
-                <div key={ex.id}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 10, border: `1.5px solid ${T.line}` }}>
-                      {ex.name}
-                    </div>
-                    <button
-                      onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
-                      title="Replace this exercise"
-                      style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      <Repeat size={16} />
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                        <ChevronLeft size={13} />
-                      </button>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
-                        {ex.sets}
-                      </span>
-                      <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
-                    <input
-                      value={ex.reps}
-                      onChange={(e) => updateExercise(day.id, ex.id, "reps", e.target.value)}
-                      placeholder="reps"
-                      style={{ ...INPUT, width: 60, flexShrink: 0, padding: "10px 8px", fontSize: 13, textAlign: "center" }}
-                    />
-                    <button onClick={() => deleteExercise(day.id, ex.id)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", marginLeft: "auto" }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {isSwapping && (
-                    <ExercisePicker
-                      onAdd={(exName) => { updateExercise(day.id, ex.id, "name", exName); setSwapFor(null); }}
-                      onClose={() => setSwapFor(null)}
-                    />
-                  )}
-                </div>
-              );
-            })}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {renderExerciseList(day)}
           </div>
 
-          {pickerFor === day.id ? (
-            <ExercisePicker
-              onAdd={(exName) => { addExercise(day.id, exName); setPickerFor(null); }}
-              onClose={() => setPickerFor(null)}
-            />
-          ) : (
-            <button onClick={() => setPickerFor(day.id)} style={{ ...BTN_SECONDARY, marginTop: 12, padding: "8px 12px", fontSize: 13, width: "auto" }}>
+          {addFlow && addFlow.dayId === day.id && addFlow.stage === "picking" && (
+            <ExercisePicker onAdd={handlePicked} onClose={finishAddFlow} />
+          )}
+          {addFlow && addFlow.dayId === day.id && addFlow.stage === "prompt" && (
+            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
+              <div style={{ fontSize: 12.5, color: T.chalk, marginBottom: 10 }}>Superset this with another exercise?</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={addSupersetPartner} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto", borderColor: T.brass, color: T.brass }}>
+                  <Link2 size={13} style={{ marginRight: 6 }} /> Add Partner
+                </button>
+                <button onClick={finishAddFlow} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto" }}>
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+          {!addFlow || addFlow.dayId !== day.id ? (
+            <button onClick={() => startAddExercise(day.id)} style={{ ...BTN_SECONDARY, marginTop: 12, padding: "8px 12px", fontSize: 13, width: "auto" }}>
               <Search size={14} style={{ marginRight: 6 }} /> Add exercise
             </button>
-          )}
+          ) : null}
         </div>
       ))}
 
@@ -1222,6 +1354,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
           name: ex.name,
           target: `${ex.sets}×${ex.reps}`,
           progressNote: suggestion?.note || null,
+          supersetId: ex.supersetId || null,
           sets: Array.from({ length: setCount }, () => ({
             weight: suggestion?.weight != null ? String(suggestion.weight) : "",
             reps: suggestion?.reps != null ? String(suggestion.reps) : "",
@@ -1415,6 +1548,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         name: ex.name,
         sets: ex.sets.filter((s) => s.weight !== "" && s.reps !== "").map((s) => ({ weight: parseFloat(s.weight), reps: parseFloat(s.reps) })),
         note: ex.note.trim() || undefined,
+        supersetId: ex.supersetId || undefined,
       }))
       .filter((ex) => ex.sets.length > 0);
     if (exercises.length === 0) return;
@@ -1629,8 +1763,21 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         const currentPR = prs[ex.name]?.weight;
         const noteOpen = noteOpenFor === exIdx;
         const isSwappingEx = swapExerciseFor === exIdx;
+        const isLastInGroup = !ex.supersetId || exIdx === log.length - 1 || log[exIdx + 1].supersetId !== ex.supersetId;
         return (
-          <div key={ex.name + exIdx} style={{ ...CARD, marginBottom: 14 }}>
+          <div
+            key={ex.name + exIdx}
+            style={{
+              ...CARD,
+              marginBottom: ex.supersetId && !isLastInGroup ? 4 : 14,
+              border: ex.supersetId ? `1.5px solid ${T.brass}` : CARD.border,
+            }}
+          >
+            {ex.supersetId && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8, color: T.brass, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <Link2 size={11} /> Superset — no rest until the last one
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</span>
