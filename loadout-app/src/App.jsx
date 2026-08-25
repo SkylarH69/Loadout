@@ -1911,13 +1911,31 @@ function buildChartPoints(dataPoints, width, height, padding) {
   });
 }
 
+const RANGE_OPTIONS = [
+  { key: "1m", label: "1M", months: 1 },
+  { key: "3m", label: "3M", months: 3 },
+  { key: "6m", label: "6M", months: 6 },
+  { key: "all", label: "All", months: null },
+];
+
 function ProgressScreen({ workouts, prs, onBack }) {
+  const [range, setRange] = useState("3m");
+
   // Deload sessions are intentionally lighter — excluding them keeps the trend
   // reflecting real working weight, not a misleading dip every deload week.
   const realWorkouts = workouts.filter((w) => !w.isDeload);
 
+  const cutoff = (() => {
+    const opt = RANGE_OPTIONS.find((o) => o.key === range);
+    if (!opt || opt.months == null) return null;
+    const d = new Date();
+    d.setMonth(d.getMonth() - opt.months);
+    return todayStr(d);
+  })();
+  const rangedWorkouts = cutoff ? realWorkouts.filter((w) => w.date >= cutoff) : realWorkouts;
+
   const frequency = {};
-  realWorkouts.forEach((w) => {
+  rangedWorkouts.forEach((w) => {
     w.exercises.forEach((ex) => {
       const maxW = Math.max(0, ...ex.sets.map((s) => s.weight));
       if (maxW > 0) frequency[ex.name] = (frequency[ex.name] || 0) + 1;
@@ -1925,18 +1943,19 @@ function ProgressScreen({ workouts, prs, onBack }) {
   });
   const exerciseNames = Object.entries(frequency).sort((a, b) => b[1] - a[1]).map(([name]) => name);
 
-  const [selected, setSelected] = useState(exerciseNames[0] || null);
+  const [selected, setSelected] = useState(null);
+  const effectiveSelected = selected && exerciseNames.includes(selected) ? selected : exerciseNames[0] || null;
 
-  const dataPoints = selected
-    ? realWorkouts
-        .filter((w) => w.exercises.some((ex) => ex.name === selected))
+  const dataPoints = effectiveSelected
+    ? rangedWorkouts
+        .filter((w) => w.exercises.some((ex) => ex.name === effectiveSelected))
         .map((w) => {
-          const ex = w.exercises.find((e) => e.name === selected);
+          const ex = w.exercises.find((e) => e.name === effectiveSelected);
           return { date: w.date, weight: Math.max(...ex.sets.map((s) => s.weight)) };
         })
     : [];
 
-  const currentPR = prs[selected]?.weight;
+  const currentPR = prs[effectiveSelected]?.weight;
   const width = 284, height = 140, padding = 20;
   const points = dataPoints.length > 0 ? buildChartPoints(dataPoints, width, height, padding) : [];
   const firstWeight = dataPoints[0]?.weight;
@@ -1948,7 +1967,24 @@ function ProgressScreen({ workouts, prs, onBack }) {
       <button onClick={onBack} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
         <ArrowLeft size={16} /> Back
       </button>
-      <h1 style={TITLE}>Progress</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <h1 style={TITLE}>Progress</h1>
+        <div style={{ display: "flex", gap: 3, background: T.iron2, borderRadius: 8, padding: 3, flexShrink: 0 }}>
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setRange(opt.key)}
+              style={{
+                padding: "5px 9px", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer",
+                background: range === opt.key ? T.rust : "transparent",
+                color: range === opt.key ? T.chalk : T.chalkDim,
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <p style={{ ...P, marginTop: 6 }}>Track how your working weight is actually trending over time.</p>
 
       {exerciseNames.length === 0 ? (
@@ -1964,9 +2000,9 @@ function ProgressScreen({ workouts, prs, onBack }) {
                 onClick={() => setSelected(name)}
                 style={{
                   flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12.5, whiteSpace: "nowrap",
-                  border: `1px solid ${selected === name ? T.rust : T.line}`,
-                  background: selected === name ? T.rust : "transparent",
-                  color: selected === name ? T.chalk : T.chalkDim, cursor: "pointer",
+                  border: `1px solid ${effectiveSelected === name ? T.rust : T.line}`,
+                  background: effectiveSelected === name ? T.rust : "transparent",
+                  color: effectiveSelected === name ? T.chalk : T.chalkDim, cursor: "pointer",
                 }}
               >
                 {name}
@@ -1976,15 +2012,15 @@ function ProgressScreen({ workouts, prs, onBack }) {
 
           {dataPoints.length < 2 ? (
             <div style={{ ...CARD, textAlign: "center", color: T.chalkDim }}>
-              Log {selected} again to start seeing a trend line.
+              Log {effectiveSelected} again in this range to start seeing a trend line.
             </div>
           ) : (
             <div style={CARD}>
               <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 2 }}>
-                {selected}
+                {effectiveSelected}
               </div>
               <div style={{ fontSize: 11, color: T.chalkDim, marginBottom: 14 }}>Max weight per session</div>
-              <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`Line chart of ${selected} max weight over time`}>
+              <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`Line chart of ${effectiveSelected} max weight over time`}>
                 <line x1="0" y1={padding} x2={width} y2={padding} stroke={T.iron3} strokeWidth="1" />
                 <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke={T.iron3} strokeWidth="1" />
                 <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke={T.iron3} strokeWidth="1" />
