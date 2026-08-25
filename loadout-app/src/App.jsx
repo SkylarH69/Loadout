@@ -1036,7 +1036,7 @@ function getNextDayIndex(workouts, days) {
   return (lastIdx + 1) % days.length;
 }
 
-function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload, weeklySchedule, onToggleScheduleDay }) {
+function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload, weeklySchedule, onToggleScheduleDay, onOpenProgress }) {
   const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
@@ -1098,7 +1098,20 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
-        <StatCard icon={<Flame size={18} color={T.rust} />} label="Streak" value={`${stats.streak}d`} />
+        <button
+          onClick={onOpenProgress}
+          style={{
+            ...CARD, textAlign: "left", cursor: "pointer", border: `1px solid ${T.rust}`,
+            display: "flex", flexDirection: "column", justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <TrendingUp size={18} color={T.rust} />
+            <ChevronRight size={16} color={T.chalkDim} />
+          </div>
+          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 20, color: T.chalk }}>Progress</div>
+          <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 2 }}>See your lifts trend</div>
+        </button>
         <StatCard icon={<TrendingUp size={18} color={T.moss} />} label="30-day volume" value={`${Math.round(stats.volume30).toLocaleString()} lb`} />
       </div>
 
@@ -1885,6 +1898,130 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 /* ---------------------------------------------------------------------- */
 /* PROFILE SCREEN — Xbox-style achievement showcase                        */
 /* ---------------------------------------------------------------------- */
+function buildChartPoints(dataPoints, width, height, padding) {
+  const weights = dataPoints.map((d) => d.weight);
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const range = maxW - minW || 1;
+  const n = dataPoints.length;
+  return dataPoints.map((d, i) => {
+    const x = n === 1 ? width / 2 : padding + (i / (n - 1)) * (width - padding * 2);
+    const y = height - padding - ((d.weight - minW) / range) * (height - padding * 2);
+    return { ...d, x, y };
+  });
+}
+
+function ProgressScreen({ workouts, prs, onBack }) {
+  // Deload sessions are intentionally lighter — excluding them keeps the trend
+  // reflecting real working weight, not a misleading dip every deload week.
+  const realWorkouts = workouts.filter((w) => !w.isDeload);
+
+  const frequency = {};
+  realWorkouts.forEach((w) => {
+    w.exercises.forEach((ex) => {
+      const maxW = Math.max(0, ...ex.sets.map((s) => s.weight));
+      if (maxW > 0) frequency[ex.name] = (frequency[ex.name] || 0) + 1;
+    });
+  });
+  const exerciseNames = Object.entries(frequency).sort((a, b) => b[1] - a[1]).map(([name]) => name);
+
+  const [selected, setSelected] = useState(exerciseNames[0] || null);
+
+  const dataPoints = selected
+    ? realWorkouts
+        .filter((w) => w.exercises.some((ex) => ex.name === selected))
+        .map((w) => {
+          const ex = w.exercises.find((e) => e.name === selected);
+          return { date: w.date, weight: Math.max(...ex.sets.map((s) => s.weight)) };
+        })
+    : [];
+
+  const currentPR = prs[selected]?.weight;
+  const width = 284, height = 140, padding = 20;
+  const points = dataPoints.length > 0 ? buildChartPoints(dataPoints, width, height, padding) : [];
+  const firstWeight = dataPoints[0]?.weight;
+  const lastWeight = dataPoints[dataPoints.length - 1]?.weight;
+  const gain = firstWeight != null && lastWeight != null ? lastWeight - firstWeight : null;
+
+  return (
+    <div style={{ padding: "20px 18px 100px" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
+        <ArrowLeft size={16} /> Back
+      </button>
+      <h1 style={TITLE}>Progress</h1>
+      <p style={{ ...P, marginTop: 6 }}>Track how your working weight is actually trending over time.</p>
+
+      {exerciseNames.length === 0 ? (
+        <div style={{ ...CARD, textAlign: "center", color: T.chalkDim }}>
+          Log a few workouts and this will fill in with real trends.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 18 }}>
+            {exerciseNames.slice(0, 10).map((name) => (
+              <button
+                key={name}
+                onClick={() => setSelected(name)}
+                style={{
+                  flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12.5, whiteSpace: "nowrap",
+                  border: `1px solid ${selected === name ? T.rust : T.line}`,
+                  background: selected === name ? T.rust : "transparent",
+                  color: selected === name ? T.chalk : T.chalkDim, cursor: "pointer",
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+
+          {dataPoints.length < 2 ? (
+            <div style={{ ...CARD, textAlign: "center", color: T.chalkDim }}>
+              Log {selected} again to start seeing a trend line.
+            </div>
+          ) : (
+            <div style={CARD}>
+              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 2 }}>
+                {selected}
+              </div>
+              <div style={{ fontSize: 11, color: T.chalkDim, marginBottom: 14 }}>Max weight per session</div>
+              <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`Line chart of ${selected} max weight over time`}>
+                <line x1="0" y1={padding} x2={width} y2={padding} stroke={T.iron3} strokeWidth="1" />
+                <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke={T.iron3} strokeWidth="1" />
+                <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke={T.iron3} strokeWidth="1" />
+                <polyline
+                  points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+                  fill="none" stroke={T.rust} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                />
+                {points.map((p, i) => (
+                  p.weight === currentPR
+                    ? <circle key={i} cx={p.x} cy={p.y} r="6" fill={T.brass} stroke={T.iron} strokeWidth="2" />
+                    : <circle key={i} cx={p.x} cy={p.y} r="3.5" fill={T.rust} />
+                ))}
+              </svg>
+              <div style={{ display: "flex", gap: 20, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
+                {gain != null && (
+                  <div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, color: T.chalk }}>
+                      {gain >= 0 ? "+" : ""}{Math.round(gain)} lb
+                    </div>
+                    <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>Since first logged</div>
+                  </div>
+                )}
+                {currentPR != null && (
+                  <div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, color: T.brass }}>{currentPR} lb</div>
+                    <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>Current PR</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function WorkoutSnapshotDetail({ senderName, snapshot, onBack }) {
   return (
     <div style={{ padding: "20px 18px 100px" }}>
@@ -2631,6 +2768,7 @@ export default function Loadout() {
   const [achievementStats, setAchievementStats] = useState(null);
   const [viewingProfile, setViewingProfile] = useState(null);
   const [viewingSnapshot, setViewingSnapshot] = useState(null); // { senderName, snapshot }
+  const [viewingProgress, setViewingProgress] = useState(false);
   const [toastQueue, setToastQueue] = useState([]);
   const [resumeDraft, setResumeDraft] = useState(null);
   const resumeCheckedRef = useRef(false);
@@ -2933,6 +3071,16 @@ export default function Loadout() {
     );
   }
 
+  if (viewingProgress) {
+    return (
+      <Shell>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <ProgressScreen workouts={workouts} prs={prs} onBack={() => setViewingProgress(false)} />
+        </div>
+      </Shell>
+    );
+  }
+
   const isTop = achievementIds.includes("rank-first");
   const deloadState = profileRow.deload_state || null;
   const weeklySchedule = profileRow.weekly_schedule || defaultWeeklySchedule(profile.program.daysPerWeek || profile.program.days.length);
@@ -2965,6 +3113,7 @@ export default function Loadout() {
             onStartDeload={startDeload}
             weeklySchedule={weeklySchedule}
             onToggleScheduleDay={toggleScheduleDay}
+            onOpenProgress={() => setViewingProgress(true)}
           />
         )}
         {tab === "programs" && (
