@@ -1918,8 +1918,22 @@ const RANGE_OPTIONS = [
   { key: "all", label: "All", months: null },
 ];
 
+const METRIC_OPTIONS = [
+  { key: "weight", label: "Max Weight" },
+  { key: "e1rm", label: "Est. 1RM" },
+];
+
+// Epley formula — a rep PR at the same weight raises this even though the
+// heaviest weight lifted hasn't changed, which is exactly the case plain
+// max-weight tracking misses.
+function estimate1RM(weight, reps) {
+  if (reps <= 1) return weight;
+  return weight * (1 + reps / 30);
+}
+
 function ProgressScreen({ workouts, prs, onBack }) {
   const [range, setRange] = useState("3m");
+  const [metric, setMetric] = useState("weight");
 
   // Deload sessions are intentionally lighter — excluding them keeps the trend
   // reflecting real working weight, not a misleading dip every deload week.
@@ -1951,11 +1965,16 @@ function ProgressScreen({ workouts, prs, onBack }) {
         .filter((w) => w.exercises.some((ex) => ex.name === effectiveSelected))
         .map((w) => {
           const ex = w.exercises.find((e) => e.name === effectiveSelected);
-          return { date: w.date, weight: Math.max(...ex.sets.map((s) => s.weight)) };
+          const value = metric === "e1rm"
+            ? Math.round(Math.max(...ex.sets.map((s) => estimate1RM(s.weight, s.reps))))
+            : Math.max(...ex.sets.map((s) => s.weight));
+          return { date: w.date, weight: value };
         })
     : [];
 
-  const currentPR = prs[effectiveSelected]?.weight;
+  const currentPR = metric === "e1rm"
+    ? (dataPoints.length ? Math.max(...dataPoints.map((d) => d.weight)) : null)
+    : prs[effectiveSelected]?.weight;
   const width = 284, height = 140, padding = 20;
   const points = dataPoints.length > 0 ? buildChartPoints(dataPoints, width, height, padding) : [];
   const firstWeight = dataPoints[0]?.weight;
@@ -2016,11 +2035,31 @@ function ProgressScreen({ workouts, prs, onBack }) {
             </div>
           ) : (
             <div style={CARD}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 2 }}>
+              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 8 }}>
                 {effectiveSelected}
               </div>
-              <div style={{ fontSize: 11, color: T.chalkDim, marginBottom: 14 }}>Max weight per session</div>
-              <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`Line chart of ${effectiveSelected} max weight over time`}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                {METRIC_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setMetric(opt.key)}
+                    style={{
+                      fontSize: 10.5, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                      border: `1px solid ${metric === opt.key ? T.rust : T.line}`,
+                      background: metric === opt.key ? T.rust : "transparent",
+                      color: metric === opt.key ? T.chalk : T.chalkDim,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {metric === "e1rm" && (
+                <div style={{ fontSize: 10.5, color: T.chalkDim, marginBottom: 14, lineHeight: 1.4 }}>
+                  Estimated from weight and reps together — a rep PR at the same weight shows up as real progress here, even when max weight hasn't moved.
+                </div>
+              )}
+              <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label={`Line chart of ${effectiveSelected} ${metric === "e1rm" ? "estimated one-rep max" : "max weight"} over time`}>
                 <line x1="0" y1={padding} x2={width} y2={padding} stroke={T.iron3} strokeWidth="1" />
                 <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke={T.iron3} strokeWidth="1" />
                 <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke={T.iron3} strokeWidth="1" />
@@ -2046,7 +2085,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
                 {currentPR != null && (
                   <div>
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, color: T.brass }}>{currentPR} lb</div>
-                    <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>Current PR</div>
+                    <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>{metric === "e1rm" ? "Best Est. 1RM" : "Current PR"}</div>
                   </div>
                 )}
               </div>
