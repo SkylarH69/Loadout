@@ -1593,7 +1593,18 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         {onShare && (
           <WorkoutShareButton
             onShare={onShare}
-            data={{ dayName: day.name, durationSeconds: elapsed, volume: totalVolume, prDetails }}
+            data={{
+              dayName: day.name,
+              durationSeconds: elapsed,
+              volume: totalVolume,
+              prDetails,
+              exercises: log
+                .map((ex) => ({
+                  name: ex.name,
+                  sets: ex.sets.filter((s) => s.weight !== "" && s.reps !== "").map((s) => ({ weight: parseFloat(s.weight), reps: parseFloat(s.reps) })),
+                }))
+                .filter((ex) => ex.sets.length > 0),
+            }}
           />
         )}
 
@@ -1874,6 +1885,52 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 /* ---------------------------------------------------------------------- */
 /* PROFILE SCREEN — Xbox-style achievement showcase                        */
 /* ---------------------------------------------------------------------- */
+function WorkoutSnapshotDetail({ senderName, snapshot, onBack }) {
+  return (
+    <div style={{ padding: "20px 18px 100px" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
+        <ArrowLeft size={16} /> Minimize
+      </button>
+
+      <div style={{ fontSize: 13, color: T.chalkDim, marginBottom: 4 }}>{senderName}'s workout</div>
+      <h1 style={TITLE}>{snapshot.dayName}</h1>
+
+      <div style={{ display: "grid", gridTemplateColumns: snapshot.prCount > 0 ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10, margin: "18px 0 24px" }}>
+        <StatCard icon={<Clock size={18} color={T.moss} />} label="Duration" value={formatDuration(snapshot.durationSeconds)} />
+        <StatCard icon={<TrendingUp size={18} color={T.rust} />} label="Volume" value={`${Math.round(snapshot.volume).toLocaleString()} lb`} />
+        {snapshot.prCount > 0 && (
+          <StatCard icon={<Award size={18} color={T.brass} />} label="PRs" value={`${snapshot.prCount}`} />
+        )}
+      </div>
+
+      {(snapshot.exercises || []).length === 0 ? (
+        <div style={{ ...CARD, textAlign: "center", color: T.chalkDim }}>No exercise detail was included with this share.</div>
+      ) : (
+        snapshot.exercises.map((ex, i) => (
+          <div key={i} style={{ ...CARD, marginBottom: 12, border: ex.isPR ? `1.5px solid ${T.brass}` : CARD.border }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk }}>{ex.name}</span>
+              {ex.isPR && (
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: T.brass, fontWeight: 600 }}>
+                  <Award size={12} /> PR
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {ex.sets.map((s, si) => (
+                <div key={si} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.chalkDim }}>
+                  <span>Set {si + 1}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk }}>{s.weight} lb × {s.reps}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function ProfileScreen({ name, isMe, myAchievementIds, myStats, onBack }) {
   const [loading, setLoading] = useState(!isMe);
   const [remoteData, setRemoteData] = useState(null);
@@ -2128,7 +2185,7 @@ function ToggleBtn({ active, onClick, children }) {
 /* ---------------------------------------------------------------------- */
 /* COMMUNITY CHAT — THE GYM FLOOR                                          */
 /* ---------------------------------------------------------------------- */
-function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOpenProfile, onActivityChange }) {
+function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOpenProfile, onActivityChange, onOpenSnapshot }) {
   const [messages, setMessages] = useState(null);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef(null);
@@ -2232,12 +2289,16 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   )}
                 </div>
                 {m.workoutSnapshot ? (
-                  <div style={{
-                    background: `linear-gradient(135deg, rgba(232,185,74,0.12), rgba(196,67,43,0.08))`,
-                    border: `1px solid ${T.brass}`, borderRadius: 14,
-                    borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
-                    padding: "12px 14px", minWidth: 200,
-                  }}>
+                  <button
+                    onClick={() => onOpenSnapshot && onOpenSnapshot(m.name, m.workoutSnapshot)}
+                    style={{
+                      background: `linear-gradient(135deg, rgba(232,185,74,0.12), rgba(196,67,43,0.08))`,
+                      border: `1px solid ${T.brass}`, borderRadius: 14,
+                      borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
+                      padding: "12px 14px", minWidth: 200, cursor: onOpenSnapshot ? "pointer" : "default",
+                      textAlign: "left", display: "block", width: "100%",
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                       <Dumbbell size={14} color={T.brass} />
                       <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13.5, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
@@ -2266,7 +2327,10 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                         </div>
                       )}
                     </div>
-                  </div>
+                    {m.workoutSnapshot.exercises && m.workoutSnapshot.exercises.length > 0 && (
+                      <div style={{ fontSize: 9.5, color: T.chalkDim, marginTop: 10, textAlign: "center" }}>Tap to view full breakdown</div>
+                    )}
+                  </button>
                 ) : (
                   <div style={{
                     background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 14,
@@ -2566,6 +2630,7 @@ export default function Loadout() {
   const [achievementIds, setAchievementIds] = useState([]);
   const [achievementStats, setAchievementStats] = useState(null);
   const [viewingProfile, setViewingProfile] = useState(null);
+  const [viewingSnapshot, setViewingSnapshot] = useState(null); // { senderName, snapshot }
   const [toastQueue, setToastQueue] = useState([]);
   const [resumeDraft, setResumeDraft] = useState(null);
   const resumeCheckedRef = useRef(false);
@@ -2739,7 +2804,7 @@ export default function Loadout() {
     const s = computeStats(newWorkouts);
     await updatePublicSnapshot(session.user.id, { currentStreak: s.streak, volume30: s.volume30, achievementIds, prsCount: Object.keys(newPrs).length });
     setLbRefresh((x) => x + 1);
-    setJustFinished({ volume: result.volume, durationSeconds: result.durationSeconds, gotPR, prDetails, dayName: result.dayName });
+    setJustFinished({ volume: result.volume, durationSeconds: result.durationSeconds, gotPR, prDetails, dayName: result.dayName, exercises: result.exercises });
     setActiveDayIdx(null);
     setTab("dashboard");
 
@@ -2765,11 +2830,17 @@ export default function Loadout() {
       : "";
     const text = `Finished ${data.dayName || "a workout"} — ${data.durationSeconds ? formatDuration(data.durationSeconds) : "?"} · ${Math.round(data.volume).toLocaleString()} lb moved.${prText}`;
     const isTop = achievementIds.includes("rank-first");
+    const prNames = new Set((data.prDetails || []).map((p) => p.name));
     const workoutSnapshot = {
       dayName: data.dayName || "Workout",
       durationSeconds: data.durationSeconds || 0,
       volume: data.volume || 0,
       prCount: data.prDetails ? data.prDetails.length : 0,
+      exercises: (data.exercises || []).map((ex) => ({
+        name: ex.name,
+        sets: ex.sets,
+        isPR: prNames.has(ex.name),
+      })),
     };
     await sendChatMessage(session.user.id, { name: profile.name, text, streak: stats.streak, achievementCount: achievementIds.length, isTop, workoutSnapshot });
     const activity = await getCommunityActivity(session.user.id);
@@ -2842,6 +2913,20 @@ export default function Loadout() {
             myAchievementIds={achievementIds}
             myStats={achievementStats}
             onBack={() => setViewingProfile(null)}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (viewingSnapshot) {
+    return (
+      <Shell>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <WorkoutSnapshotDetail
+            senderName={viewingSnapshot.senderName}
+            snapshot={viewingSnapshot.snapshot}
+            onBack={() => setViewingSnapshot(null)}
           />
         </div>
       </Shell>
@@ -2921,6 +3006,7 @@ export default function Loadout() {
             isTop={isTop}
             onOpenProfile={setViewingProfile}
             onActivityChange={refreshCommunityActivity}
+            onOpenSnapshot={(senderName, snapshot) => setViewingSnapshot({ senderName, snapshot })}
           />
         )}
         {tab === "about" && <AboutTab onSignOut={signOut} accountEmail={session.user.email} />}
