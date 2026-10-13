@@ -3,7 +3,7 @@ import {
   Dumbbell, Flame, Trophy, MessageCircle, Home, Plus, ChevronRight,
   ChevronLeft, Check, X, TrendingUp, Award, Send, Medal, Pencil,
   ArrowLeft, MessageSquare, Layers, Heart, Users, ShieldCheck, ExternalLink,
-  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat, Link2
+  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat, Link2, ChevronUp, ChevronDown
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
@@ -441,6 +441,17 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
     setDays((prev) => prev.map((d) => d.id !== dayId ? d : { ...d, name }));
   };
 
+  const moveDay = (dayId, dir) => {
+    setDays((prev) => {
+      const i = prev.findIndex((d) => d.id === dayId);
+      const j = i + dir;
+      if (i === -1 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+
   const save = () => {
     const cleaned = days
       .map((d) => ({ ...d, exercises: d.exercises.filter((e) => e.name.trim()) }))
@@ -552,15 +563,37 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
 
       {visibleDays.map((day) => (
         <div key={day.id} style={{ ...CARD, marginBottom: 14 }}>
-          <input
-            value={day.name}
-            onChange={(e) => renameDay(day.id, e.target.value)}
-            style={{
-              background: "none", border: "none", borderBottom: `1px solid ${T.line}`, color: T.chalk,
-              fontFamily: "'Oswald', sans-serif", fontSize: 16, textTransform: "uppercase",
-              padding: "0 0 8px", marginBottom: 14, width: "100%", outline: "none",
-            }}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            {days.length > 1 && (!focusDayId || showAllDays) && (
+              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                <button
+                  onClick={() => moveDay(day.id, -1)}
+                  disabled={days[0].id === day.id}
+                  title="Move earlier in the rotation"
+                  style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, lineHeight: 0, opacity: days[0].id === day.id ? 0.25 : 1 }}
+                >
+                  <ChevronUp size={18} />
+                </button>
+                <button
+                  onClick={() => moveDay(day.id, 1)}
+                  disabled={days[days.length - 1].id === day.id}
+                  title="Move later in the rotation"
+                  style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, lineHeight: 0, opacity: days[days.length - 1].id === day.id ? 0.25 : 1 }}
+                >
+                  <ChevronDown size={18} />
+                </button>
+              </div>
+            )}
+            <input
+              value={day.name}
+              onChange={(e) => renameDay(day.id, e.target.value)}
+              style={{
+                background: "none", border: "none", borderBottom: `1px solid ${T.line}`, color: T.chalk,
+                fontFamily: "'Oswald', sans-serif", fontSize: 16, textTransform: "uppercase",
+                padding: "0 0 8px", flex: 1, minWidth: 0, outline: "none",
+              }}
+            />
+          </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             {renderExerciseList(day)}
           </div>
@@ -614,6 +647,17 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
 
   const removeDay = (dayId) => {
     setDays((prev) => (prev.length > 1 ? prev.filter((d) => d.id !== dayId) : prev));
+  };
+
+  const moveDay = (dayId, dir) => {
+    setDays((prev) => {
+      const i = prev.findIndex((d) => d.id === dayId);
+      const j = i + dir;
+      if (i === -1 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   };
 
   const renameDay = (dayId, dayName) => {
@@ -808,6 +852,26 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
       {(focusDayId && !showAllDays ? days.filter((d) => d.id === focusDayId) : days).map((day) => (
         <div key={day.id} style={{ ...CARD, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            {days.length > 1 && (!focusDayId || showAllDays) && (
+              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                <button
+                  onClick={() => moveDay(day.id, -1)}
+                  disabled={days[0].id === day.id}
+                  title="Move earlier in the rotation"
+                  style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, lineHeight: 0, opacity: days[0].id === day.id ? 0.25 : 1 }}
+                >
+                  <ChevronUp size={18} />
+                </button>
+                <button
+                  onClick={() => moveDay(day.id, 1)}
+                  disabled={days[days.length - 1].id === day.id}
+                  title="Move later in the rotation"
+                  style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", padding: 0, lineHeight: 0, opacity: days[days.length - 1].id === day.id ? 0.25 : 1 }}
+                >
+                  <ChevronDown size={18} />
+                </button>
+              </div>
+            )}
             <input
               value={day.name}
               onChange={(e) => renameDay(day.id, e.target.value)}
