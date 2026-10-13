@@ -1036,7 +1036,7 @@ function getNextDayIndex(workouts, days) {
   return (lastIdx + 1) % days.length;
 }
 
-function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload, weeklySchedule, onToggleScheduleDay, onOpenProgress }) {
+function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfile, onEditNext, achievementCount, deloadSignal, deloadState, onStartDeload, onEndDeload, onDismissDeload, weeklySchedule, onToggleScheduleDay, onOpenProgress }) {
   const nextDayIdx = getNextDayIndex(workouts, profile.program.days);
   const nextDay = profile.program.days[nextDayIdx];
   const recentPRs = Object.entries(prs).sort((a, b) => b[1].date.localeCompare(a[1].date)).slice(0, 3);
@@ -1078,6 +1078,12 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
           <div style={{ fontSize: 13, color: T.chalk }}>
             Deload week in progress — {(deloadState.doneDayNames || []).length} / {profile.program.days.length} days done light.
           </div>
+          <button
+            onClick={() => { if (window.confirm("End this deload and go back to normal training?")) onEndDeload(); }}
+            style={{ ...BTN_SECONDARY, marginLeft: "auto", padding: "6px 10px", fontSize: 12, flexShrink: 0 }}
+          >
+            End deload
+          </button>
         </div>
       )}
       {!deloadState && deloadSignal?.recommended && (
@@ -1091,9 +1097,14 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
               <div key={i} style={{ fontSize: 12.5, color: T.chalkDim, lineHeight: 1.4 }}>• {r}</div>
             ))}
           </div>
-          <button onClick={onStartDeload} style={{ ...BTN_SECONDARY, borderColor: T.brass, color: T.brass }}>
-            Start deload week
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={onStartDeload} style={{ ...BTN_SECONDARY, borderColor: T.brass, color: T.brass }}>
+              Start deload week
+            </button>
+            <button onClick={onDismissDeload} style={{ ...BTN_SECONDARY }}>
+              I already deloaded
+            </button>
+          </div>
         </div>
       )}
 
@@ -1299,13 +1310,14 @@ function suggestNextTarget(exerciseName, targetRepsStr, workouts) {
 /* of recent working weight — cuts volume harder than intensity, which is  */
 /* the combination best supported for shedding fatigue without detraining. */
 /* ---------------------------------------------------------------------- */
-function computeDeloadSignal(workouts, program) {
+function computeDeloadSignal(workouts, program, dismissedAt) {
   const nonDeload = workouts.filter((w) => !w.isDeload);
   if (nonDeload.length < 4) return { recommended: false, reasons: [] };
 
   const deloadWorkouts = workouts.filter((w) => w.isDeload);
   const lastDeloadDate = deloadWorkouts.length ? deloadWorkouts[deloadWorkouts.length - 1].date : nonDeload[0].date;
-  const weeksSince = Math.floor((Date.now() - new Date(lastDeloadDate + "T00:00:00").getTime()) / (7 * 86400000));
+  const baselineMs = Math.max(new Date(lastDeloadDate + "T00:00:00").getTime(), dismissedAt || 0);
+  const weeksSince = Math.floor((Date.now() - baselineMs) / (7 * 86400000));
 
   const exerciseNames = new Set(program.days.flatMap((d) => d.exercises.map((e) => e.name)));
   let stalledCount = 0;
@@ -3021,7 +3033,7 @@ export default function Loadout() {
     setActiveDayIdx(null);
     setTab("dashboard");
 
-    if (result.isDeload && profileRow?.deload_state) {
+    if (result.isDeload && profileRow?.deload_state?.startedAt) {
       const doneDayNames = Array.from(new Set([...(profileRow.deload_state.doneDayNames || []), result.dayName]));
       const allDayNames = new Set(userProgram.days.map((d) => d.name));
       const complete = [...allDayNames].every((n) => doneDayNames.includes(n));
@@ -3035,6 +3047,17 @@ export default function Loadout() {
     const state = { startedAt: Date.now(), doneDayNames: [] };
     await setDeloadState(session.user.id, state);
     setProfileRow((prev) => ({ ...prev, deload_state: state }));
+  };
+
+  // Ending or dismissing both record a timestamp so the "weeks since deload" clock restarts.
+  const endDeload = async () => {
+    const state = { dismissedAt: Date.now() };
+    try {
+      await setDeloadState(session.user.id, state);
+      setProfileRow((prev) => ({ ...prev, deload_state: state }));
+    } catch (e) {
+      alert("Couldn't update deload: " + (e?.message || e));
+    }
   };
 
   const shareWorkoutToChat = async (data) => {
@@ -3157,9 +3180,10 @@ export default function Loadout() {
   }
 
   const isTop = achievementIds.includes("rank-first");
-  const deloadState = profileRow.deload_state || null;
+  const deloadState = profileRow.deload_state?.startedAt ? profileRow.deload_state : null;
+  const deloadDismissedAt = profileRow.deload_state?.dismissedAt || null;
   const weeklySchedule = profileRow.weekly_schedule || defaultWeeklySchedule(profile.program.daysPerWeek || profile.program.days.length);
-  const deloadSignal = !deloadState ? computeDeloadSignal(workouts, profile.program) : null;
+  const deloadSignal = !deloadState ? computeDeloadSignal(workouts, profile.program, deloadDismissedAt) : null;
   const currentToast = toastQueue[0] || null;
   const dismissToast = () => setToastQueue((q) => q.slice(1));
 
@@ -3186,6 +3210,8 @@ export default function Loadout() {
             deloadSignal={deloadSignal}
             deloadState={deloadState}
             onStartDeload={startDeload}
+            onEndDeload={endDeload}
+            onDismissDeload={endDeload}
             weeklySchedule={weeklySchedule}
             onToggleScheduleDay={toggleScheduleDay}
             onOpenProgress={() => setViewingProgress(true)}
