@@ -67,7 +67,7 @@ function TipBox({ name }) {
   return (
     <div style={{
       fontSize: 12.5, color: T.chalk, lineHeight: 1.5, background: "rgba(232,185,74,0.08)",
-      border: `1px solid rgba(232,185,74,0.3)`, borderRadius: 8, padding: "8px 10px", margin: "6px 0 8px",
+      border: `1px solid rgba(232,185,74,0.3)`, borderRadius: 2, padding: "8px 10px", margin: "6px 0 8px",
     }}>
       <div style={{ fontSize: 10, color: T.brass, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 }}>How to</div>
       {getExerciseTip(name, cat)}
@@ -93,13 +93,13 @@ function ExercisePicker({ onAdd, onClose }) {
     : [];
 
   const chip = (active) => ({
-    background: active ? T.rust : T.iron3, color: active ? T.chalk : T.chalkDim,
-    border: `1px solid ${active ? T.rust : T.line}`, borderRadius: 999, padding: "5px 11px",
+    background: active ? T.rust : T.iron3, color: active ? T.paper : T.chalkDim,
+    border: `1px solid ${active ? T.rust : T.line}`, borderRadius: 2, padding: "5px 11px",
     fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
   });
 
   return (
-    <div style={{ background: T.iron, border: `1px solid ${T.line}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
+    <div style={{ background: T.iron, border: `1px solid ${T.line}`, borderRadius: 2, padding: 12, marginTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Search size={15} color={T.chalkDim} style={{ flexShrink: 0 }} />
         <input
@@ -148,7 +148,7 @@ function ExercisePicker({ onAdd, onClose }) {
               <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 8, padding: "9px 10px",
+                  background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 2, padding: "9px 10px",
                 }}
               >
                 <button
@@ -172,7 +172,7 @@ function ExercisePicker({ onAdd, onClose }) {
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  <Plus size={14} color={T.chalk} />
+                  <Plus size={14} color={T.paper} />
                 </button>
               </div>
               {tipFor === ex.name && <TipBox name={ex.name} />}
@@ -190,7 +190,7 @@ function PlateStack({ filled, total, size = 22, color = T.rust }) {
     <div style={{ display: "flex", flexDirection: "column-reverse", gap: 3, alignItems: "center" }}>
       {plates.map((on, i) => (
         <div key={i} style={{
-          width: size + i * 3, height: size * 0.34, borderRadius: 4,
+          width: size + i * 3, height: size * 0.34, borderRadius: 2,
           background: on ? color : "transparent",
           border: `2px solid ${on ? color : T.line}`,
           transition: "background .3s ease",
@@ -206,58 +206,65 @@ function Barbell({ percent }) {
   const render = (a) => a.map((on, i) => (
     <div key={i} style={{
       width: 8, height: 34 + (on ? 10 : 0),
-      background: on ? T.rust : "rgba(242,239,233,0.12)",
+      background: on ? T.rust : "rgba(29,32,22,0.15)",
       borderRadius: 2, marginLeft: i === 0 ? 0 : -1,
     }} />
   ));
   return (
     <div style={{ display: "flex", alignItems: "center", height: 44 }}>
       <div style={{ display: "flex" }}>{render([...arr].reverse())}</div>
-      <div style={{ height: 6, background: "rgba(242,239,233,0.25)", flex: 1, minWidth: 40 }} />
+      <div style={{ height: 6, background: "rgba(29,32,22,0.35)", flex: 1, minWidth: 40 }} />
       <div style={{ display: "flex" }}>{render(arr)}</div>
     </div>
   );
 }
 
 function WeekCalendar({ schedule, workouts, onToggleDay }) {
-  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  // Monday-first roster. `schedule` stays Sunday-indexed (0 = Sun) so saved schedules keep working.
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
   const now = new Date();
   const todayIdx = now.getDay();
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - todayIdx);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((todayIdx + 6) % 7));
   const completedDates = new Set(workouts.map((w) => w.date));
+  const display = { fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800 };
+  const mono = { fontFamily: "'IBM Plex Mono', monospace" };
 
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
-      {dayLabels.map((label, i) => {
-        const dateObj = new Date(weekStart);
-        dateObj.setDate(weekStart.getDate() + i);
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+      {order.map((dayIdx, col) => {
+        const dateObj = new Date(monday);
+        dateObj.setDate(monday.getDate() + col);
         const dateStr = todayStr(dateObj);
-        const isTraining = schedule[i];
-        const isToday = i === todayIdx;
+        const isTraining = schedule[dayIdx];
+        const isToday = dayIdx === todayIdx;
         const completed = completedDates.has(dateStr);
-
-        let bg = "transparent";
-        let border = T.line;
-        if (isTraining && completed) { bg = T.moss; border = T.moss; }
-        else if (isTraining) { border = T.chalkDim; }
+        const done = isTraining && completed;
 
         return (
           <button
-            key={i}
-            onClick={() => onToggleDay(i)}
+            key={dayIdx}
+            onClick={() => onToggleDay(dayIdx)}
             title={isTraining ? "Training day — tap to make a rest day" : "Rest day — tap to make a training day"}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", flex: 1 }}
+            style={{
+              height: 56, padding: "5px 0 6px", cursor: "pointer", display: "flex", flexDirection: "column",
+              justifyContent: "space-between", alignItems: "center", boxSizing: "border-box",
+              border: isToday ? `3px solid ${T.rust}` : isTraining && !done ? `2px dashed ${T.chalk}` : `2px solid ${T.chalk}`,
+              background: done ? T.moss : !isTraining ? T.iron3 : "transparent",
+              color: done ? T.paper : T.chalk, borderRadius: 2,
+            }}
           >
-            <span style={{ fontSize: 10.5, color: T.chalkDim }}>{label}</span>
-            <div style={{
-              width: 28, height: 28, borderRadius: "50%", background: bg,
-              border: `1.5px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: isToday ? `0 0 0 2px ${T.brass}` : "none",
-            }}>
-              {isTraining && completed && <Check size={13} color={T.iron} />}
-              {!isTraining && <span style={{ fontSize: 11, color: T.chalk, fontWeight: 600 }}>R</span>}
-            </div>
+            <span style={{ ...mono, fontSize: 10, fontWeight: isToday ? 600 : 400 }}>{dayNames[dayIdx]}</span>
+            {done ? (
+              <Check size={18} color={T.paper} strokeWidth={3.5} />
+            ) : !isTraining ? (
+              <span style={{ ...display, fontSize: 16, color: T.chalkDim }}>REST</span>
+            ) : isToday ? (
+              <span style={{ ...display, fontSize: 14, color: T.rust }}>TODAY</span>
+            ) : (
+              <span />
+            )}
           </button>
         );
       })}
@@ -279,13 +286,13 @@ function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }
         }}
       >
         <div style={{
-          width: 42, height: 42, borderRadius: 10, background: T.rust, flexShrink: 0,
+          width: 42, height: 42, borderRadius: 2, background: T.rust, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <Sparkles size={20} color={T.chalk} />
+          <Sparkles size={20} color={T.paper} />
         </div>
         <div>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 17, color: T.chalk, textTransform: "uppercase", marginBottom: 3 }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 17, color: T.chalk, textTransform: "uppercase", marginBottom: 3 }}>
             Create Your Own
           </div>
           <div style={{ fontSize: 13, color: T.chalkDim, lineHeight: 1.4 }}>
@@ -305,9 +312,9 @@ function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 18, color: T.chalk, textTransform: "uppercase" }}>{p.name}</div>
+              <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 18, color: T.chalk, textTransform: "uppercase" }}>{p.name}</div>
               <div style={{
-                fontSize: 10.5, padding: "3px 8px", borderRadius: 20, color: T.iron, fontWeight: 600,
+                fontSize: 10.5, padding: "3px 8px", borderRadius: 2, color: T.iron, fontWeight: 600,
                 background: CAT_COLOR[p.category] || T.chalkDim, whiteSpace: "nowrap", marginLeft: 8,
               }}>
                 {p.category}
@@ -368,7 +375,7 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onA
       </button>
 
       <div style={{
-        fontSize: 10.5, padding: "3px 8px", borderRadius: 20, color: T.iron, fontWeight: 600,
+        fontSize: 10.5, padding: "3px 8px", borderRadius: 2, color: T.iron, fontWeight: 600,
         background: CAT_COLOR[program.category] || T.chalkDim, display: "inline-block", marginBottom: 10,
       }}>
         {program.category}
@@ -381,14 +388,14 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onA
 
       {program.days.map((day, i) => (
         <div key={i} style={{ ...CARD, marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 10 }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 10 }}>
             {day.name}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {day.exercises.map((ex, j) => (
               <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: T.chalkDim }}>
                 <span>{ex.name}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{ex.sets}×{ex.reps}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{ex.sets}×{ex.reps}</span>
               </div>
             ))}
           </div>
@@ -402,7 +409,7 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onA
       <div style={{ borderTop: `1px solid ${T.line}`, paddingTop: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <MessageSquare size={16} color={T.chalkDim} />
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase" }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase" }}>
             Talk about this program
           </div>
         </div>
@@ -419,7 +426,7 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onA
               <div style={{
                 width: 30, height: 30, borderRadius: "50%", background: T.iron3, flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontFamily: "'Oswald', sans-serif", color: T.rust,
+                fontSize: 12, fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, color: T.rust,
               }}>
                 {c.name.slice(0, 1).toUpperCase()}
               </div>
@@ -443,7 +450,7 @@ function ProgramDetail({ program, onBack, onUse, myName, myUserId, isActive, onA
             style={{ ...INPUT, flex: 1 }}
           />
           <button onClick={send} disabled={sending || !draft.trim()} style={{ ...ROUND_BTN, background: T.rust, opacity: draft.trim() ? 1 : 0.5 }}>
-            <Send size={15} color={T.chalk} />
+            <Send size={15} color={T.paper} />
           </button>
         </div>
       </div>
@@ -579,7 +586,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
             <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
               <ChevronLeft size={13} />
             </button>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
               {ex.sets}
             </span>
             <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
@@ -619,7 +626,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
           j++;
         }
         elements.push(
-          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 10, padding: "10px 10px 2px", marginBottom: 12 }}>
+          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 2, padding: "10px 10px 2px", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, color: T.brass, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }}>
               <Link2 size={12} /> Superset — {group.length} exercises back-to-back
             </div>
@@ -678,7 +685,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
               onChange={(e) => renameDay(day.id, e.target.value)}
               style={{
                 background: "none", border: "none", borderBottom: `1px solid ${T.line}`, color: T.chalk,
-                fontFamily: "'Oswald', sans-serif", fontSize: 16, textTransform: "uppercase",
+                fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 16, textTransform: "uppercase",
                 padding: "0 0 8px", flex: 1, minWidth: 0, outline: "none",
               }}
             />
@@ -691,7 +698,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
             <ExercisePicker onAdd={handlePicked} onClose={finishAddFlow} />
           )}
           {addFlow && addFlow.dayId === day.id && addFlow.stage === "prompt" && (
-            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
+            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 2, padding: 12, marginTop: 4 }}>
               <div style={{ fontSize: 12.5, color: T.chalk, marginBottom: 10 }}>Superset this with another exercise?</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={addSupersetPartner} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto", borderColor: T.brass, color: T.brass }}>
@@ -817,7 +824,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
     return (
       <div key={ex.id}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 10, border: `1.5px solid ${T.line}` }}>
+          <div style={{ flex: 1, fontSize: 13.5, color: T.chalk, padding: "10px 12px", background: T.iron3, borderRadius: 2, border: `1.5px solid ${T.line}` }}>
             {ex.name}
           </div>
           <button
@@ -841,7 +848,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
             <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
               <ChevronLeft size={13} />
             </button>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalk, fontSize: 13, minWidth: 16, textAlign: "center" }}>
               {ex.sets}
             </span>
             <button onClick={() => changeSets(day.id, ex.id, 1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
@@ -881,7 +888,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
           j++;
         }
         elements.push(
-          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 10, padding: "10px 10px 2px", marginBottom: 12 }}>
+          <div key={ex.supersetId} style={{ border: `1.5px solid ${T.brass}`, borderRadius: 2, padding: "10px 10px 2px", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, color: T.brass, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }}>
               <Link2 size={12} /> Superset — {group.length} exercises back-to-back
             </div>
@@ -906,7 +913,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
       </button>
 
       <div style={{
-        fontSize: 10.5, padding: "3px 8px", borderRadius: 20, color: T.iron, fontWeight: 600,
+        fontSize: 10.5, padding: "3px 8px", borderRadius: 2, color: T.iron, fontWeight: 600,
         background: T.rust, display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 10,
       }}>
         <Sparkles size={12} /> Create Your Own
@@ -930,14 +937,14 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
       {(!focusDayId || showAllDays) && (
         <div style={{ ...CARD, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Frequency</div>
+            <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Frequency</div>
             <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 2 }}>{days.length} training day{days.length !== 1 ? "s" : ""} a week</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => days.length > 1 && removeDay(days[days.length - 1].id)} style={ROUND_BTN}>
               <Minus size={16} />
             </button>
-            <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, color: T.chalk, minWidth: 26, textAlign: "center" }}>
+            <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 22, color: T.chalk, minWidth: 26, textAlign: "center" }}>
               {days.length}
             </span>
             <button onClick={addDay} style={ROUND_BTN}>
@@ -975,7 +982,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
               onChange={(e) => renameDay(day.id, e.target.value)}
               style={{
                 background: "none", border: "none", borderBottom: `1px solid ${T.line}`, color: T.chalk,
-                fontFamily: "'Oswald', sans-serif", fontSize: 16, textTransform: "uppercase",
+                fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 16, textTransform: "uppercase",
                 padding: "0 0 8px", flex: 1, outline: "none",
               }}
             />
@@ -998,7 +1005,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
             <ExercisePicker onAdd={handlePicked} onClose={finishAddFlow} />
           )}
           {addFlow && addFlow.dayId === day.id && addFlow.stage === "prompt" && (
-            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
+            <div style={{ border: `1px dashed ${T.brass}`, borderRadius: 2, padding: 12, marginTop: 4 }}>
               <div style={{ fontSize: 12.5, color: T.chalk, marginBottom: 10 }}>Superset this with another exercise?</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={addSupersetPartner} style={{ ...BTN_SECONDARY, padding: "8px 12px", fontSize: 12.5, width: "auto", borderColor: T.brass, color: T.brass }}>
@@ -1104,7 +1111,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
         {profile.program.days.map((day, i) => (
           <div key={day.id || i} style={{ ...CARD, marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 17, color: T.chalk, textTransform: "uppercase" }}>{day.name}</div>
+              <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 17, color: T.chalk, textTransform: "uppercase" }}>{day.name}</div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <button
                   onClick={() => openEditor(day.id)}
@@ -1122,7 +1129,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
               {day.exercises.map((ex) => (
                 <div key={ex.id || ex.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: T.chalkDim }}>
                   <span>{ex.name}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{ex.sets}×{ex.reps}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace" }}>{ex.sets}×{ex.reps}</span>
                 </div>
               ))}
             </div>
@@ -1205,12 +1212,14 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
 
   return (
     <div style={{ padding: "24px 18px 100px" }}>
-      <div style={{ fontFamily: "Inter, sans-serif", color: T.chalkDim, fontSize: 14 }}>Welcome back</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: T.moss, fontWeight: 600 }}>
+        DAILY ORDERS · {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase()}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap", borderBottom: `3px solid ${T.chalk}`, paddingBottom: 10 }}>
         <button
           onClick={onOpenProfile}
           style={{
-            fontFamily: "'Oswald', sans-serif", fontSize: 34, color: T.chalk, margin: "2px 0", textTransform: "uppercase",
+            fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 34, color: T.chalk, margin: "2px 0", textTransform: "uppercase",
             letterSpacing: 0.5, background: "none", border: "none", padding: 0, cursor: onOpenProfile ? "pointer" : "default",
           }}
         >
@@ -1222,7 +1231,7 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
             title="View all achievements"
             style={{
               display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: T.brass,
-              border: `1px solid ${T.brass}`, borderRadius: 20, padding: "4px 10px",
+              border: `1px solid ${T.brass}`, borderRadius: 2, padding: "4px 10px",
               background: "rgba(232,185,74,0.08)", cursor: onOpenProfile ? "pointer" : "default",
             }}
           >
@@ -1252,7 +1261,7 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
         <div style={{ ...CARD, marginBottom: 18, border: `1px solid ${T.brass}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <Sparkles size={16} color={T.brass} />
-            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Deload recommended</div>
+            <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Deload recommended</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 14 }}>
             {deloadSignal.reasons.map((r, i) => (
@@ -1270,64 +1279,71 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
-        <button
-          onClick={onOpenProgress}
-          style={{
-            ...CARD, textAlign: "left", cursor: "pointer", border: `1px solid ${T.rust}`,
-            display: "flex", flexDirection: "column", justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <TrendingUp size={18} color={T.rust} />
-            <ChevronRight size={16} color={T.chalkDim} />
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: T.chalk }}>ROSTER</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 1, color: T.moss, fontWeight: 600 }}>
+            {stats.sessionsThisWeek} / {profile.program.daysPerWeek || profile.program.days.length} LIFTS
           </div>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 20, color: T.chalk }}>Progress</div>
-          <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 2 }}>See your lifts trend</div>
-        </button>
-        <StatCard icon={<TrendingUp size={18} color={T.moss} />} label="30-day volume" value={`${Math.round(stats.volume30).toLocaleString()} lb`} />
-      </div>
-
-      <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5 }}>This week</div>
-          <div style={{ color: T.chalkDim, fontSize: 13 }}>{stats.sessionsThisWeek} / {profile.program.daysPerWeek || profile.program.days.length} sessions</div>
         </div>
         <WeekCalendar schedule={weeklySchedule} workouts={workouts} onToggleDay={onToggleScheduleDay} />
-        <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 10, lineHeight: 1.4 }}>
-          Tap any day to mark it a training or rest day — this adjusts to your real schedule, not just the textbook version.
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: T.chalkDim, marginTop: 8, lineHeight: 1.4 }}>
+          TAP A DAY TO SWITCH TRAINING / REST.
         </div>
       </div>
 
-      <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Up next — {nextDay.name}
-          </div>
-          {onEditNext && (
-            <button onClick={onEditNext} title="Edit this plan" style={{ ...ROUND_BTN, width: 30, height: 30, background: "transparent", flexShrink: 0 }}>
-              <Pencil size={13} />
-            </button>
-          )}
+      <div style={{ ...CARD, border: `3px solid ${T.chalk}`, boxShadow: `6px 6px 0 ${T.chalk}`, marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 1.5 }}>
+          <span style={{ color: T.rust, fontWeight: 600 }}>UP NEXT</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span>{nextDay.exercises.length} LINES · {profile.program.splitName.toUpperCase()}</span>
+            {onEditNext && (
+              <button onClick={onEditNext} title="Edit this plan" style={{ ...ROUND_BTN, width: 28, height: 28, borderRadius: 2, flexShrink: 0 }}>
+                <Pencil size={13} />
+              </button>
+            )}
+          </span>
         </div>
-        <div style={{ color: T.chalkDim, fontSize: 13, marginBottom: 14 }}>{nextDay.exercises.length} exercises · {profile.program.splitName}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+        <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 40, textTransform: "uppercase", lineHeight: 1, margin: "6px 0 12px", color: T.chalk }}>
+          {nextDay.name}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 9, borderTop: `2px solid ${T.chalk}`, paddingTop: 12, marginBottom: 16 }}>
           {nextDay.exercises.slice(0, 4).map((ex) => (
-            <div key={ex.id || ex.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5, color: T.chalk }}>
-              <span>{ex.name}</span>
-              <span style={{ color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{ex.sets}×{ex.reps}</span>
+            <div key={ex.id || ex.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: T.chalk }}>
+              <span style={{ width: 14, height: 14, border: `2px solid ${T.chalk}`, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>{ex.name}</span>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12 }}>{ex.sets}×{ex.reps}</span>
             </div>
           ))}
-          {nextDay.exercises.length > 4 && <div style={{ fontSize: 12.5, color: T.chalkDim }}>+{nextDay.exercises.length - 4} more</div>}
+          {nextDay.exercises.length > 4 && (
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: T.chalkDim }}>+ {nextDay.exercises.length - 4} MORE LINES</div>
+          )}
         </div>
-        <button onClick={() => onStartWorkout(nextDayIdx)} style={BTN_PRIMARY}>
-          Start workout <ChevronRight size={18} style={{ marginLeft: 4 }} />
+        <button onClick={() => onStartWorkout(nextDayIdx)} style={{ ...BTN_PRIMARY, fontSize: 22, letterSpacing: 2 }}>
+          Begin workout
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.2fr", border: `2px solid ${T.chalk}`, textAlign: "center", marginBottom: 18 }}>
+        {[
+          { v: workouts.length, l: "SESSIONS" },
+          { v: Object.keys(prs).length, l: "PRS" },
+          { v: stats.volume30 >= 10000 ? `${(stats.volume30 / 1000).toFixed(1)}k` : Math.round(stats.volume30).toLocaleString(), l: "30D LB" },
+        ].map((c) => (
+          <div key={c.l} style={{ padding: "10px 2px", borderRight: `2px solid ${T.chalk}` }}>
+            <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 26, lineHeight: 1.1 }}>{c.v}</div>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, letterSpacing: 1 }}>{c.l}</div>
+          </div>
+        ))}
+        <button onClick={onOpenProgress} style={{ padding: "10px 2px", background: T.moss, color: T.paper, border: "none", cursor: "pointer" }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 20, lineHeight: 1.3 }}>PROGRESS</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, letterSpacing: 1 }}>CHARTS →</div>
         </button>
       </div>
 
       {recentPRs.length > 0 && (
         <div style={CARD}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>Recent PRs</div>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, color: T.chalk, fontSize: 15, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>Recent PRs</div>
           {recentPRs.map(([name, pr]) => (
             <div key={name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: `1px solid ${T.line}` }}>
               <Award size={16} color={T.brass} />
@@ -1335,7 +1351,7 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
                 <div style={{ fontSize: 13.5, color: T.chalk }}>{name}</div>
                 <div style={{ fontSize: 12, color: T.chalkDim }}>{pr.date}</div>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.brass, fontSize: 14 }}>{pr.weight} lb</div>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.brass, fontSize: 14 }}>{pr.weight} lb</div>
             </div>
           ))}
         </div>
@@ -1346,12 +1362,12 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
 
 function StatCard({ icon, label, value }) {
   return (
-    <div style={CARD}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+    <div style={{ ...CARD, boxShadow: "none", padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         {icon}
-        <span style={{ fontSize: 12.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
       </div>
-      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 26, color: T.chalk }}>{value}</div>
+      <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 28, color: T.chalk, lineHeight: 1 }}>{value}</div>
     </div>
   );
 }
@@ -1798,15 +1814,15 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 
         <div style={{ ...CARD, marginBottom: 18, display: "flex", justifyContent: "space-between" }}>
           <div style={{ fontSize: 13, color: T.chalkDim }}>Exercises</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13 }}>{log.length}</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalk, fontSize: 13 }}>{log.length}</div>
         </div>
         <div style={{ ...CARD, marginBottom: 18, display: "flex", justifyContent: "space-between" }}>
           <div style={{ fontSize: 13, color: T.chalkDim }}>Sets completed</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk, fontSize: 13 }}>{totalSets}</div>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalk, fontSize: 13 }}>{totalSets}</div>
         </div>
 
         <div style={{ marginBottom: 22 }}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
             Effort (RPE)
           </div>
           <div style={{ fontSize: 12.5, color: T.chalkDim, marginBottom: 12 }}>How hard did that feel, 1 (easy) to 10 (max effort)?</div>
@@ -1819,7 +1835,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                   width: 34, height: 34, borderRadius: "50%", cursor: "pointer",
                   border: `1.5px solid ${rpe === n ? T.rust : T.line}`,
                   background: rpe === n ? T.rust : T.iron2,
-                  color: T.chalk, fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
+                  color: T.chalk, fontFamily: "'IBM Plex Mono', monospace", fontSize: 13,
                 }}
               >
                 {n}
@@ -1829,7 +1845,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         </div>
 
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
             Notes on this session
           </div>
           <textarea
@@ -1837,7 +1853,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
             onChange={(e) => setComment(e.target.value)}
             placeholder="How did it go? Anything to remember for next time…"
             rows={4}
-            style={{ ...INPUT, resize: "vertical", fontFamily: "Inter, sans-serif", lineHeight: 1.4 }}
+            style={{ ...INPUT, resize: "vertical", fontFamily: "'IBM Plex Sans', sans-serif", lineHeight: 1.4 }}
           />
         </div>
 
@@ -1858,15 +1874,15 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
         <button onClick={() => { clearDraft(); onCancel(); }} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
           <ChevronLeft size={18} /> Cancel
         </button>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.rust, fontSize: 13 }}>{Math.round(confirmedVolume).toLocaleString()} lb confirmed</div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.rust, fontSize: 13 }}>{Math.round(confirmedVolume).toLocaleString()} lb confirmed</div>
       </div>
 
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        background: T.iron2, border: `1px solid ${T.line}`, borderRadius: 12, padding: "12px 0", marginBottom: 18,
+        background: T.chalk, border: `2px solid ${T.chalk}`, borderRadius: 2, padding: "12px 0", marginBottom: 18,
       }}>
-        <Clock size={16} color={T.moss} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, color: T.chalk, letterSpacing: 1 }}>
+        <Clock size={16} color="#F3B58A" />
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 24, color: T.paper, letterSpacing: 1 }}>
           {formatDuration(elapsed)}
         </span>
       </div>
@@ -1875,7 +1891,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
       {deloadActive && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8, background: "rgba(232,185,74,0.1)",
-          border: `1px solid ${T.brass}`, borderRadius: 10, padding: "10px 12px", marginBottom: 18, fontSize: 12.5, color: T.brass,
+          border: `1px solid ${T.brass}`, borderRadius: 2, padding: "10px 12px", marginBottom: 18, fontSize: 12.5, color: T.brass,
         }}>
           <Sparkles size={15} style={{ flexShrink: 0 }} />
           Deload week — lighter weight, fewer sets, on purpose.
@@ -1890,7 +1906,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Flame size={16} color={T.moss} />
-              <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>Warm-Up</span>
+              <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>Warm-Up</span>
               <span style={{ fontSize: 11, color: T.chalkDim }}>({warmupDone.size}/{warmup.length})</span>
             </div>
             {warmupOpen ? <ChevronLeft size={16} color={T.chalkDim} style={{ transform: "rotate(-90deg)" }} /> : <ChevronRight size={16} color={T.chalkDim} />}
@@ -1918,7 +1934,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                         <span style={{ fontSize: 13.5, color: done ? T.chalkDim : T.chalk, textDecoration: done ? "line-through" : "none" }}>{item.name}</span>
-                        <span style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>{item.sets}×{item.reps}</span>
+                        <span style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'IBM Plex Mono', monospace", flexShrink: 0 }}>{item.sets}×{item.reps}</span>
                       </div>
                       <div style={{ fontSize: 11.5, color: T.chalkDim, marginTop: 2, lineHeight: 1.35 }}>{item.reason}</div>
                     </div>
@@ -1928,7 +1944,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
 
               {rampCandidates.length > 0 && (
                 <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 4, paddingTop: 14 }}>
-                  <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+                  <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 13, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
                     Ramp Into Your Working Weight
                   </div>
                   <div style={{ fontSize: 11.5, color: T.chalkDim, lineHeight: 1.4, marginBottom: 12 }}>
@@ -1941,10 +1957,10 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                         {generateRampSets(weight).map((s, i) => (
                           <div key={i} style={{
                             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                            background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 8, padding: "6px 10px", minWidth: 52,
+                            background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 2, padding: "6px 10px", minWidth: 52,
                           }}>
                             <span style={{ fontSize: 10, color: T.chalkDim }}>{s.label}</span>
-                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: T.chalk }}>{s.weight}</span>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: T.chalk }}>{s.weight}</span>
                             <span style={{ fontSize: 10, color: T.chalkDim }}>×{s.reps}</span>
                           </div>
                         ))}
@@ -1979,7 +1995,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
             )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</span>
+                <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 16, color: T.chalk }}>{ex.name}</span>
                 <button
                   onClick={() => setTipOpenFor(tipOpenFor === exIdx ? null : exIdx)}
                   title="How to do this exercise"
@@ -2006,7 +2022,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                 >
                   <StickyNote size={15} />
                 </button>
-                <div style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{ex.target}</div>
+                <div style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'IBM Plex Mono', monospace" }}>{ex.target}</div>
               </div>
             </div>
             {tipOpenFor === exIdx && <TipBox name={ex.name} />}
@@ -2020,8 +2036,8 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
             {ex.progressNote && (
               <div style={{
                 display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: T.moss,
-                background: "rgba(143,184,155,0.1)", border: `1px solid rgba(143,184,155,0.3)`,
-                borderRadius: 8, padding: "7px 10px", marginBottom: 10, lineHeight: 1.4,
+                background: "rgba(75,91,58,0.12)", border: `1.5px solid ${T.moss}`,
+                borderRadius: 2, padding: "7px 10px", marginBottom: 10, lineHeight: 1.4,
               }}>
                 <TrendingUp size={13} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>{ex.progressNote}</span>
@@ -2035,14 +2051,14 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                 placeholder="Private note for this exercise — form cues, pain, equipment used…"
                 rows={2}
                 autoFocus
-                style={{ ...INPUT, resize: "vertical", fontSize: 12.5, fontFamily: "Inter, sans-serif", marginBottom: 10, padding: "8px 10px" }}
+                style={{ ...INPUT, resize: "vertical", fontSize: 12.5, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: 10, padding: "8px 10px" }}
               />
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
               {ex.sets.map((set, setIdx) => (
-                <div key={setIdx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 22, fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{setIdx + 1}</div>
+                <div key={setIdx} style={{ display: "flex", alignItems: "center", gap: 8, background: set.confirmed ? "rgba(75,91,58,0.12)" : "transparent", margin: "0 -6px", padding: "3px 6px" }}>
+                  <div style={{ width: 22, fontSize: 13, fontWeight: 600, color: T.chalk, fontFamily: "'IBM Plex Mono', monospace" }}>{setIdx + 1}</div>
                   <input value={set.weight} onChange={(e) => updateSet(exIdx, setIdx, "weight", e.target.value)} placeholder="lb" inputMode="decimal" style={{ ...INPUT, padding: "10px 12px", fontSize: 14 }} />
                   <span style={{ color: T.chalkDim, fontSize: 13 }}>×</span>
                   <input value={set.reps} onChange={(e) => updateSet(exIdx, setIdx, "reps", e.target.value)} placeholder="reps" inputMode="decimal" style={{ ...INPUT, padding: "10px 12px", fontSize: 14 }} />
@@ -2050,13 +2066,13 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                     onClick={() => confirmSet(exIdx, setIdx)}
                     title={set.confirmed ? "Confirmed — tap to undo" : "Confirm this set"}
                     style={{
-                      width: 32, height: 32, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
-                      border: `1.5px solid ${set.confirmed ? T.moss : T.line}`,
+                      width: 34, height: 34, borderRadius: 2, flexShrink: 0, cursor: "pointer",
+                      border: `2.5px solid ${set.confirmed ? T.moss : T.chalk}`,
                       background: set.confirmed ? T.moss : "transparent",
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}
                   >
-                    <Check size={15} color={set.confirmed ? T.iron : T.chalkDim} />
+                    <Check size={17} strokeWidth={3.5} color={set.confirmed ? T.paper : "transparent"} />
                   </button>
                   <button onClick={() => removeSet(exIdx, setIdx)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer" }}>
                     <X size={16} />
@@ -2171,13 +2187,13 @@ function ProgressScreen({ workouts, prs, onBack }) {
       </button>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <h1 style={TITLE}>Progress</h1>
-        <div style={{ display: "flex", gap: 3, background: T.iron2, borderRadius: 8, padding: 3, flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 3, background: T.iron2, borderRadius: 2, padding: 3, flexShrink: 0 }}>
           {RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setRange(opt.key)}
               style={{
-                padding: "5px 9px", borderRadius: 6, fontSize: 11, border: "none", cursor: "pointer",
+                padding: "5px 9px", borderRadius: 2, fontSize: 11, border: "none", cursor: "pointer",
                 background: range === opt.key ? T.rust : "transparent",
                 color: range === opt.key ? T.chalk : T.chalkDim,
               }}
@@ -2201,7 +2217,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
                 key={name}
                 onClick={() => setSelected(name)}
                 style={{
-                  flexShrink: 0, padding: "8px 14px", borderRadius: 20, fontSize: 12.5, whiteSpace: "nowrap",
+                  flexShrink: 0, padding: "8px 14px", borderRadius: 2, fontSize: 12.5, whiteSpace: "nowrap",
                   border: `1px solid ${effectiveSelected === name ? T.rust : T.line}`,
                   background: effectiveSelected === name ? T.rust : "transparent",
                   color: effectiveSelected === name ? T.chalk : T.chalkDim, cursor: "pointer",
@@ -2218,7 +2234,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
             </div>
           ) : (
             <div style={CARD}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", marginBottom: 8 }}>
                 {effectiveSelected}
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
@@ -2227,7 +2243,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
                     key={opt.key}
                     onClick={() => setMetric(opt.key)}
                     style={{
-                      fontSize: 10.5, padding: "4px 10px", borderRadius: 12, cursor: "pointer",
+                      fontSize: 10.5, padding: "4px 10px", borderRadius: 2, cursor: "pointer",
                       border: `1px solid ${metric === opt.key ? T.rust : T.line}`,
                       background: metric === opt.key ? T.rust : "transparent",
                       color: metric === opt.key ? T.chalk : T.chalkDim,
@@ -2259,7 +2275,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
               <div style={{ display: "flex", gap: 20, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
                 {gain != null && (
                   <div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, color: T.chalk }}>
+                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, color: T.chalk }}>
                       {gain >= 0 ? "+" : ""}{Math.round(gain)} lb
                     </div>
                     <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>Since first logged</div>
@@ -2267,7 +2283,7 @@ function ProgressScreen({ workouts, prs, onBack }) {
                 )}
                 {currentPR != null && (
                   <div>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, color: T.brass }}>{currentPR} lb</div>
+                    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 15, color: T.brass }}>{currentPR} lb</div>
                     <div style={{ fontSize: 9, color: T.chalkDim, textTransform: "uppercase" }}>{metric === "e1rm" ? "Best Est. 1RM" : "Current PR"}</div>
                   </div>
                 )}
@@ -2304,7 +2320,7 @@ function WorkoutSnapshotDetail({ senderName, snapshot, onBack }) {
         snapshot.exercises.map((ex, i) => (
           <div key={i} style={{ ...CARD, marginBottom: 12, border: ex.isPR ? `1.5px solid ${T.brass}` : CARD.border }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk }}>{ex.name}</span>
+              <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk }}>{ex.name}</span>
               {ex.isPR && (
                 <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: T.brass, fontWeight: 600 }}>
                   <Award size={12} /> PR
@@ -2315,7 +2331,7 @@ function WorkoutSnapshotDetail({ senderName, snapshot, onBack }) {
               {ex.sets.map((s, si) => (
                 <div key={si} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.chalkDim }}>
                   <span>Set {si + 1}</span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalk }}>{s.weight} lb × {s.reps}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalk }}>{s.weight} lb × {s.reps}</span>
                 </div>
               ))}
             </div>
@@ -2362,7 +2378,7 @@ function ProfileScreen({ name, isMe, myAchievementIds, myStats, onBack }) {
         <div style={{
           width: 58, height: 58, borderRadius: "50%", background: T.iron3, border: `2px solid ${T.rust}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "'Oswald', sans-serif", fontSize: 24, color: T.rust, flexShrink: 0,
+          fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 24, color: T.rust, flexShrink: 0,
         }}>
           {name.slice(0, 1).toUpperCase()}
         </div>
@@ -2391,12 +2407,12 @@ function ProfileScreen({ name, isMe, myAchievementIds, myStats, onBack }) {
         <>
           <div style={{ ...CARD, marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase" }}>Achievements</div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.brass, fontSize: 14 }}>
+              <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase" }}>Achievements</div>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.brass, fontSize: 14 }}>
                 {unlockedIds.length} / {ACHIEVEMENTS.length}
               </div>
             </div>
-            <div style={{ height: 8, background: T.iron3, borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ height: 8, background: T.iron3, borderRadius: 2, overflow: "hidden" }}>
               <div style={{
                 height: "100%", width: `${(unlockedIds.length / ACHIEVEMENTS.length) * 100}%`,
                 background: T.brass, transition: "width .4s ease",
@@ -2533,11 +2549,11 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, background: "none", border: "none", cursor: onOpenProfile ? "pointer" : "default" }}
               >
                 <Medal size={20} color={medalColor[rank]} />
-                <div style={{ fontFamily: "'Oswald', sans-serif", color: T.chalk, fontSize: 13, maxWidth: 76, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, color: T.chalk, fontSize: 13, maxWidth: 76, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {entry.name}
                 </div>
                 <PlateStack filled={rank === 0 ? 4 : rank === 1 ? 3 : 2} total={4} color={medalColor[rank]} size={rank === 0 ? 26 : 20} />
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 11.5 }}>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalkDim, fontSize: 11.5 }}>
                   {formatMetric(metric, entry)}
                 </div>
               </button>
@@ -2553,9 +2569,9 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
             onClick={() => onOpenProfile && onOpenProfile(entry.name)}
             style={{ ...CARD, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, border: entry.name === myName ? `1.5px solid ${T.rust}` : `1px solid ${T.line}`, cursor: onOpenProfile ? "pointer" : "default", textAlign: "left", width: "100%" }}
           >
-            <div style={{ width: 22, fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 13 }}>{i + 4}</div>
+            <div style={{ width: 22, fontFamily: "'IBM Plex Mono', monospace", color: T.chalkDim, fontSize: 13 }}>{i + 4}</div>
             <div style={{ flex: 1, fontSize: 14, color: T.chalk }}>{entry.name}</div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", color: T.chalkDim, fontSize: 13 }}>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: T.chalkDim, fontSize: 13 }}>
               {formatMetric(metric, entry)}
             </div>
           </button>
@@ -2568,9 +2584,9 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
 function ToggleBtn({ active, onClick, children }) {
   return (
     <button onClick={onClick} style={{
-      padding: "8px 16px", borderRadius: 20, border: `1px solid ${active ? T.rust : T.line}`,
-      background: active ? T.rust : "transparent", color: active ? T.chalk : T.chalkDim,
-      fontSize: 13, fontFamily: "Inter, sans-serif", cursor: "pointer",
+      padding: "8px 16px", borderRadius: 2, border: `1px solid ${active ? T.rust : T.line}`,
+      background: active ? T.rust : "transparent", color: active ? T.paper : T.chalkDim,
+      fontSize: 13, fontFamily: "'IBM Plex Sans', sans-serif", cursor: "pointer",
     }}>
       {children}
     </button>
@@ -2666,7 +2682,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                     {typeof m.achievementCount === "number" && m.achievementCount > 0 && (
                       <span style={{
                         display: "flex", alignItems: "center", gap: 2, fontSize: 10.5, color: T.brass,
-                        border: `1px solid ${T.brass}`, borderRadius: 10, padding: "1px 6px",
+                        border: `1px solid ${T.brass}`, borderRadius: 2, padding: "1px 6px",
                       }}>
                         <Award size={10} /> {m.achievementCount}
                       </span>
@@ -2688,7 +2704,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                     onClick={() => onOpenSnapshot && onOpenSnapshot(m.name, m.workoutSnapshot)}
                     style={{
                       background: `linear-gradient(135deg, rgba(232,185,74,0.12), rgba(196,67,43,0.08))`,
-                      border: `1px solid ${T.brass}`, borderRadius: 14,
+                      border: `1px solid ${T.brass}`, borderRadius: 2,
                       borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
                       padding: "12px 14px", minWidth: 200, cursor: onOpenSnapshot ? "pointer" : "default",
                       textAlign: "left", display: "block", width: "100%",
@@ -2696,26 +2712,26 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                       <Dumbbell size={14} color={T.brass} />
-                      <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13.5, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 13.5, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         {m.workoutSnapshot.dayName}
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 14 }}>
                       <div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.chalk }}>
+                        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, color: T.chalk }}>
                           {formatDuration(m.workoutSnapshot.durationSeconds)}
                         </div>
                         <div style={{ fontSize: 9.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 0.3 }}>Time</div>
                       </div>
                       <div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.chalk }}>
+                        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, color: T.chalk }}>
                           {Math.round(m.workoutSnapshot.volume).toLocaleString()}
                         </div>
                         <div style={{ fontSize: 9.5, color: T.chalkDim, textTransform: "uppercase", letterSpacing: 0.3 }}>Lb Moved</div>
                       </div>
                       {m.workoutSnapshot.prCount > 0 && (
                         <div>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: T.brass }}>
+                          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, color: T.brass }}>
                             {m.workoutSnapshot.prCount}
                           </div>
                           <div style={{ fontSize: 9.5, color: T.brass, textTransform: "uppercase", letterSpacing: 0.3 }}>PR{m.workoutSnapshot.prCount > 1 ? "s" : ""}</div>
@@ -2728,7 +2744,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   </button>
                 ) : (
                   <div style={{
-                    background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 14,
+                    background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 2,
                     borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
                     fontSize: 14, lineHeight: 1.4, wordBreak: "break-word",
                   }}>
@@ -2744,7 +2760,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
       <div style={{ display: "flex", gap: 8, padding: "12px 0 20px", borderTop: `1px solid ${T.line}` }}>
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Say something to the floor…" style={{ ...INPUT, flex: 1 }} />
         <button onClick={send} disabled={sending || !draft.trim()} style={{ ...ROUND_BTN, background: T.rust, opacity: draft.trim() ? 1 : 0.5 }}>
-          <Send size={16} color={T.chalk} />
+          <Send size={16} color={T.paper} />
         </button>
       </div>
     </div>
@@ -2774,7 +2790,7 @@ function AboutTab({ onSignOut, accountEmail }) {
   return (
     <div style={{ padding: "24px 18px 100px" }}>
       <div style={{
-        fontSize: 10.5, padding: "3px 8px", borderRadius: 20, color: T.iron, fontWeight: 600,
+        fontSize: 10.5, padding: "3px 8px", borderRadius: 2, color: T.iron, fontWeight: 600,
         background: T.brass, display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 10,
       }}>
         <ShieldCheck size={12} /> {ABOUT.eyebrow}
@@ -2798,7 +2814,7 @@ function AboutTab({ onSignOut, accountEmail }) {
             <ShieldCheck size={18} color={T.brass} />
           </div>
           <div>
-            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.chalk, textTransform: "uppercase", marginBottom: 6 }}>
+            <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 14, color: T.chalk, textTransform: "uppercase", marginBottom: 6 }}>
               From the founder
             </div>
             <div style={{ fontSize: 13.5, color: T.chalkDim, lineHeight: 1.5, fontStyle: "italic" }}>
@@ -2808,7 +2824,7 @@ function AboutTab({ onSignOut, accountEmail }) {
         </div>
       </div>
 
-      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+      <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
         What we bring to the floor
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
@@ -2825,7 +2841,7 @@ function AboutTab({ onSignOut, accountEmail }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Heart size={16} color={T.rust} />
-        <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk, textTransform: "uppercase", letterSpacing: 0.5 }}>
           Our sponsors
         </div>
       </div>
@@ -2834,9 +2850,9 @@ function AboutTab({ onSignOut, accountEmail }) {
           <div key={s.name} style={CARD}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{
-                width: 40, height: 40, borderRadius: 10, background: T.iron3, flexShrink: 0,
+                width: 40, height: 40, borderRadius: 2, background: T.iron3, flexShrink: 0,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "'Oswald', sans-serif", fontSize: 15, color: T.brass,
+                fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.brass,
               }}>
                 {s.name.slice(0, 1).toUpperCase()}
               </div>
@@ -2863,22 +2879,22 @@ function AboutTab({ onSignOut, accountEmail }) {
 }
 function Nav({ tab, setTab }) {
   const items = [
-    { id: "dashboard", icon: Home, label: "Home" },
-    { id: "programs", icon: Dumbbell, label: "Plan" },
-    { id: "leaderboard", icon: Trophy, label: "Ranks" },
-    { id: "chat", icon: MessageCircle, label: "Floor" },
-    { id: "about", icon: Heart, label: "About" },
+    { id: "dashboard", icon: Home, label: "HOME" },
+    { id: "programs", icon: Dumbbell, label: "PLAN" },
+    { id: "leaderboard", icon: Trophy, label: "RANKS" },
+    { id: "chat", icon: MessageCircle, label: "FLOOR" },
+    { id: "about", icon: Heart, label: "ABOUT" },
   ];
   return (
-    <div style={{ display: "flex", borderTop: `1px solid ${T.line}`, background: T.iron, position: "sticky", bottom: 0, left: 0, right: 0 }}>
+    <div style={{ display: "flex", background: T.chalk, position: "sticky", bottom: 0, left: 0, right: 0 }}>
       {items.map(({ id, icon: Icon, label }) => (
         <button key={id} onClick={() => setTab(id)} style={{
-          flex: 1, background: "none", border: "none", padding: "12px 0 14px", display: "flex",
-          flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer",
-          color: tab === id ? T.rust : T.chalkDim,
+          flex: 1, background: "none", border: "none", borderTop: `3px solid ${tab === id ? T.rust : "transparent"}`,
+          padding: "10px 0 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer",
+          color: tab === id ? "#F3B58A" : "rgba(241,237,221,0.7)",
         }}>
-          <Icon size={20} />
-          <span style={{ fontSize: 10.5, fontFamily: "Inter, sans-serif", letterSpacing: 0.3 }}>{label}</span>
+          <Icon size={19} />
+          <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", letterSpacing: 1 }}>{label}</span>
         </button>
       ))}
     </div>
@@ -2934,7 +2950,7 @@ function FinishBanner({ data, onClose, onShare }) {
 
   return (
     <div style={{
-      margin: "18px 18px 0", padding: "14px 16px", borderRadius: 12, background: "rgba(143,184,155,0.14)",
+      margin: "18px 18px 0", padding: "14px 16px", borderRadius: 2, background: "rgba(75,91,58,0.14)",
       border: `1px solid ${T.moss}`,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2952,7 +2968,7 @@ function FinishBanner({ data, onClose, onShare }) {
           disabled={shareState === "sharing" || shareState === "shared"}
           style={{
             marginTop: 10, background: "none", border: `1px solid ${shareState === "shared" ? T.moss : T.line}`,
-            borderRadius: 8, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6,
+            borderRadius: 2, padding: "7px 12px", display: "flex", alignItems: "center", gap: 6,
             color: shareState === "shared" ? T.moss : T.chalk, fontSize: 12.5, cursor: shareState === "idle" ? "pointer" : "default",
           }}
         >
@@ -2986,8 +3002,8 @@ function AchievementToast({ achievement, onDismiss }) {
       style={{
         position: "absolute", top: 16, left: 16, right: 16, zIndex: 50,
         display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
-        background: T.iron2, border: `1.5px solid ${color}`, borderRadius: 14,
-        padding: "12px 14px", boxShadow: `0 0 24px ${color}55, 0 8px 20px rgba(0,0,0,0.4)`,
+        background: T.iron2, border: `2.5px solid ${T.chalk}`, borderRadius: 2,
+        padding: "12px 14px", boxShadow: `5px 5px 0 ${T.chalk}`,
         animation: "toastDrop .4s cubic-bezier(.2,1.4,.4,1)",
       }}
     >
@@ -3001,7 +3017,7 @@ function AchievementToast({ achievement, onDismiss }) {
         <div style={{ fontSize: 10.5, color, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600 }}>
           Achievement Unlocked
         </div>
-        <div style={{ fontSize: 14.5, color: T.chalk, fontFamily: "'Oswald', sans-serif", textTransform: "uppercase", letterSpacing: 0.3 }}>
+        <div style={{ fontSize: 14.5, color: T.chalk, fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3 }}>
           {achievement.name}
         </div>
       </div>
@@ -3440,12 +3456,17 @@ function Shell({ children }) {
   return (
     <div style={{
       width: "100%", maxWidth: 480, margin: "0 auto", height: "100vh", maxHeight: 900, background: T.iron,
-      display: "flex", flexDirection: "column", fontFamily: "Inter, sans-serif", position: "relative",
-      overflow: "hidden", borderRadius: 20, boxShadow: "0 0 0 1px rgba(242,239,233,0.06)",
+      display: "flex", flexDirection: "column", fontFamily: "'IBM Plex Sans', sans-serif", position: "relative",
+      overflow: "hidden", borderRadius: 0, boxShadow: `0 0 0 2px ${T.chalk}`,
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
         * { box-sizing: border-box; }
+        /* Screens that still carry the old font names (e.g. login) pick up the new faces too. */
+        [style*="Oswald"] { font-family: 'Big Shoulders Display', sans-serif !important; font-weight: 800 !important; }
+        [style*="Inter,"] { font-family: 'IBM Plex Sans', sans-serif !important; }
+        [style*="JetBrains"] { font-family: 'IBM Plex Mono', monospace !important; }
+        body { background: ${T.iron} !important; }
         input:focus { border-color: ${T.rust} !important; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: ${T.line}; border-radius: 3px; }
