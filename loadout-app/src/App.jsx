@@ -12,7 +12,7 @@ import { getExerciseTip } from "./exerciseTips.js";
 import { CARD, H2, P, TITLE, INPUT, BTN_PRIMARY, BTN_SECONDARY, ROUND_BTN } from "./styles.js";
 import {
   nextId, todayStr, daysAgo, formatDuration, computeStats, formatRelativeTime,
-  buildAchievementStats, ACHIEVEMENTS, ACHIEVEMENT_ICONS, TIER_COLOR,
+  buildAchievementStats, ACHIEVEMENTS, ACHIEVEMENT_ICONS, TIER_COLOR as TIER_COLOR_BASE,
 } from "./achievements.js";
 import { AuthScreen, ChooseName } from "./Auth.jsx";
 import {
@@ -25,6 +25,9 @@ import {
   getCommunityActivity, setCommunityActivity as setCommunityActivity_db,
   getChatMessages, sendChatMessage, deleteChatMessage, getProgramComments, sendProgramComment,
 } from "./db.js";
+
+// Tier colors re-tuned so medals stay readable on the paper background.
+const TIER_COLOR = { ...TIER_COLOR_BASE, bronze: "#9A5A32", silver: "#6F7782", gold: T.brass, platinum: "#2F7F8A" };
 
 /* ---------------------------------------------------------------------- */
 /* ABOUT US CONTENT — edit this section directly to make it yours          */
@@ -99,7 +102,7 @@ function ExercisePicker({ onAdd, onClose }) {
   });
 
   return (
-    <div style={{ background: T.iron, border: `1px solid ${T.line}`, borderRadius: 2, padding: 12, marginTop: 4 }}>
+    <div style={{ background: T.iron, border: `2px solid ${T.chalk}`, borderRadius: 2, padding: 12, marginTop: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Search size={15} color={T.chalkDim} style={{ flexShrink: 0 }} />
         <input
@@ -281,7 +284,7 @@ function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }
         onClick={onCreateCustom}
         style={{
           ...CARD, textAlign: "left", cursor: "pointer", marginBottom: 12,
-          border: `1.5px dashed ${T.rust}`, background: "rgba(196,67,43,0.08)",
+          border: `2px dashed ${T.rust}`, boxShadow: "none", background: "rgba(184,67,15,0.08)",
           display: "flex", alignItems: "center", gap: 14,
         }}
       >
@@ -308,7 +311,7 @@ function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }
             onClick={() => onSelect(p.id)}
             style={{
               ...CARD, textAlign: "left", cursor: "pointer",
-              border: p.id === activeProgramId ? `1.5px solid ${T.rust}` : `1px solid ${T.line}`,
+              ...(p.id === activeProgramId ? { border: `2px solid ${T.rust}`, boxShadow: `4px 4px 0 ${T.rust}` } : {}),
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
@@ -1258,7 +1261,7 @@ function Dashboard({ profile, workouts, stats, onStartWorkout, prs, onOpenProfil
         </div>
       )}
       {!deloadState && deloadSignal?.recommended && (
-        <div style={{ ...CARD, marginBottom: 18, border: `1px solid ${T.brass}` }}>
+        <div style={{ ...CARD, marginBottom: 18, border: `2px solid ${T.brass}`, boxShadow: `4px 4px 0 ${T.brass}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <Sparkles size={16} color={T.brass} />
             <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 14, color: T.chalk, textTransform: "uppercase" }}>Deload recommended</div>
@@ -2318,7 +2321,7 @@ function WorkoutSnapshotDetail({ senderName, snapshot, onBack }) {
         <div style={{ ...CARD, textAlign: "center", color: T.chalkDim }}>No exercise detail was included with this share.</div>
       ) : (
         snapshot.exercises.map((ex, i) => (
-          <div key={i} style={{ ...CARD, marginBottom: 12, border: ex.isPR ? `1.5px solid ${T.brass}` : CARD.border }}>
+          <div key={i} style={{ ...CARD, marginBottom: 12, ...(ex.isPR ? { border: `2px solid ${T.brass}`, boxShadow: `4px 4px 0 ${T.brass}` } : {}) }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 15, color: T.chalk }}>{ex.name}</span>
               {ex.isPR && (
@@ -2460,14 +2463,14 @@ function ProfileScreen({ name, isMe, myAchievementIds, myStats, onBack }) {
                   <div style={{
                     width: 48, height: 48, borderRadius: "50%",
                     background: unlocked ? TIER_COLOR[a.tier] : T.iron2,
-                    border: `1.5px solid ${unlocked ? TIER_COLOR[a.tier] : T.line}`,
+                    border: unlocked ? `2px solid ${T.chalk}` : `2px dashed ${T.chalkDim}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     opacity: unlocked ? 1 : 0.55,
                   }}>
                     <Icon size={19} color={unlocked ? T.iron : T.chalkDim} />
                   </div>
                   <div style={{
-                    fontSize: 9.5, color: unlocked ? T.chalkDim : "rgba(169,167,159,0.5)", textAlign: "center",
+                    fontSize: 9.5, color: unlocked ? T.chalk : "rgba(90,89,72,0.65)", textAlign: "center",
                     lineHeight: 1.2, maxWidth: 62, overflow: "hidden", textOverflow: "ellipsis",
                     display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
                   }}>
@@ -2522,7 +2525,7 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
   const sorted = [...entries].sort((a, b) => (b[metricKey] || 0) - (a[metricKey] || 0));
   const top3 = sorted.slice(0, 3);
   const rest = sorted.slice(3);
-  const medalColor = [T.brass, "#C9CDD3", "#B9764F"];
+  const medalColor = [T.brass, "#6F7782", "#9A5A32"];
 
   return (
     <div style={{ padding: "24px 18px 100px" }}>
@@ -2567,7 +2570,7 @@ function Leaderboard({ myName, refreshKey, onOpenProfile }) {
           <button
             key={entry.name}
             onClick={() => onOpenProfile && onOpenProfile(entry.name)}
-            style={{ ...CARD, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, border: entry.name === myName ? `1.5px solid ${T.rust}` : `1px solid ${T.line}`, cursor: onOpenProfile ? "pointer" : "default", textAlign: "left", width: "100%" }}
+            style={{ ...CARD, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, ...(entry.name === myName ? { border: `2px solid ${T.rust}`, boxShadow: `3px 3px 0 ${T.rust}` } : { boxShadow: `3px 3px 0 ${T.chalk}` }), cursor: onOpenProfile ? "pointer" : "default", textAlign: "left", width: "100%" }}
           >
             <div style={{ width: 22, fontFamily: "'IBM Plex Mono', monospace", color: T.chalkDim, fontSize: 13 }}>{i + 4}</div>
             <div style={{ flex: 1, fontSize: 14, color: T.chalk }}>{entry.name}</div>
@@ -2703,9 +2706,8 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   <button
                     onClick={() => onOpenSnapshot && onOpenSnapshot(m.name, m.workoutSnapshot)}
                     style={{
-                      background: `linear-gradient(135deg, rgba(232,185,74,0.12), rgba(196,67,43,0.08))`,
-                      border: `1px solid ${T.brass}`, borderRadius: 2,
-                      borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
+                      background: T.iron2,
+                      border: `3px solid ${T.chalk}`, borderRadius: 2, boxShadow: `5px 5px 0 ${T.brass}`,
                       padding: "12px 14px", minWidth: 200, cursor: onOpenSnapshot ? "pointer" : "default",
                       textAlign: "left", display: "block", width: "100%",
                     }}
@@ -2744,8 +2746,8 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
                   </button>
                 ) : (
                   <div style={{
-                    background: mine ? T.rust : T.iron3, color: T.chalk, padding: "9px 13px", borderRadius: 2,
-                    borderBottomRightRadius: mine ? 4 : 14, borderBottomLeftRadius: mine ? 14 : 4,
+                    background: mine ? T.rust : T.iron2, color: mine ? T.paper : T.chalk, padding: "9px 13px", borderRadius: 2,
+                    border: `2px solid ${T.chalk}`, boxShadow: `3px 3px 0 ${T.chalk}`,
                     fontSize: 14, lineHeight: 1.4, wordBreak: "break-word",
                   }}>
                     {m.text}
@@ -2757,7 +2759,7 @@ function Chat({ myName, myUserId, isAdmin, streak, achievementCount, isTop, onOp
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, padding: "12px 0 20px", borderTop: `1px solid ${T.line}` }}>
+      <div style={{ display: "flex", gap: 8, padding: "12px 0 20px", borderTop: `2px solid ${T.chalk}` }}>
         <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Say something to the floor…" style={{ ...INPUT, flex: 1 }} />
         <button onClick={send} disabled={sending || !draft.trim()} style={{ ...ROUND_BTN, background: T.rust, opacity: draft.trim() ? 1 : 0.5 }}>
           <Send size={16} color={T.paper} />
