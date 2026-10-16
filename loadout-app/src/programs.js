@@ -1,13 +1,15 @@
 export const T = {
-  iron: "#0E1210",
-  iron2: "#161B18",
-  iron3: "#1F2521",
-  chalk: "#F2EFE9",
-  chalkDim: "#A9A79F",
-  rust: "#C4432B",
-  moss: "#8FB89B",
-  brass: "#E8B94A",
-  line: "rgba(242,239,233,0.09)",
+  // Field Manual palette — names kept from the dark theme so every screen picks it up.
+  iron: "#E6E1CF",      // page background (paper)
+  iron2: "#F1EDDD",     // cards
+  iron3: "#D9D3BC",     // inset fields / chips
+  chalk: "#1D2016",     // primary text + borders (ink)
+  chalkDim: "#5A5948",  // secondary text
+  rust: "#B8430F",      // accent (burnt orange)
+  moss: "#4B5B3A",      // success (olive)
+  brass: "#8A6212",     // highlight (PRs, supersets, deload)
+  line: "rgba(29,32,22,0.28)",
+  paper: "#F1EDDD",     // light text on dark/colored fills
 };
 
 export const CAT_COLOR = {
