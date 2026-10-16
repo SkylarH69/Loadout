@@ -3,11 +3,12 @@ import {
   Dumbbell, Flame, Trophy, MessageCircle, Home, Plus, ChevronRight,
   ChevronLeft, Check, X, TrendingUp, Award, Send, Medal, Pencil,
   ArrowLeft, MessageSquare, Layers, Heart, Users, ShieldCheck, ExternalLink,
-  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat, Link2, ChevronUp, ChevronDown
+  Search, Sparkles, Trash2, Minus, Clock, StickyNote, Repeat, Link2, ChevronUp, ChevronDown, Info
 } from "lucide-react";
 
 import { supabase } from "./supabaseClient.js";
 import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY, generateWarmup, defaultWeeklySchedule } from "./programs.js";
+import { getExerciseTip } from "./exerciseTips.js";
 import { CARD, H2, P, TITLE, INPUT, BTN_PRIMARY, BTN_SECONDARY, ROUND_BTN } from "./styles.js";
 import {
   nextId, todayStr, daysAgo, formatDuration, computeStats, formatRelativeTime,
@@ -48,15 +49,58 @@ const SPONSORS = [
   { name: "Add Another Sponsor", tagline: "Duplicate this entry for each business or brand supporting Loadout.", url: "" },
 ];
 
+const BODY_GROUPS = [
+  { label: "Chest", cats: ["Chest"] },
+  { label: "Back", cats: ["Back"] },
+  { label: "Shoulders", cats: ["Shoulders"] },
+  { label: "Arms", cats: ["Biceps", "Triceps", "Forearms"] },
+  { label: "Legs", cats: ["Quads", "Hamstrings", "Glutes", "Calves"] },
+  { label: "Core", cats: ["Core"] },
+  { label: "Full Body", cats: ["Full Body"] },
+  { label: "Cardio", cats: ["Cardio", "Running"] },
+  { label: "Combat", cats: ["Combat Sports"] },
+];
+
+// Small tappable info icon + the tip text it reveals. Used in the picker, builder, and logger.
+function TipBox({ name }) {
+  const cat = EXERCISE_LIBRARY.find((e) => e.name === name)?.category;
+  return (
+    <div style={{
+      fontSize: 12.5, color: T.chalk, lineHeight: 1.5, background: "rgba(232,185,74,0.08)",
+      border: `1px solid rgba(232,185,74,0.3)`, borderRadius: 8, padding: "8px 10px", margin: "6px 0 8px",
+    }}>
+      <div style={{ fontSize: 10, color: T.brass, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 }}>How to</div>
+      {getExerciseTip(name, cat)}
+    </div>
+  );
+}
+
 function ExercisePicker({ onAdd, onClose }) {
   const [query, setQuery] = useState("");
-  const results = query.trim()
-    ? EXERCISE_LIBRARY.filter((e) => e.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 40)
+  const [group, setGroup] = useState(null); // BODY_GROUPS label, or null for All
+  const [sub, setSub] = useState(null); // a single category within the group, or null for all
+  const [tipFor, setTipFor] = useState(null);
+
+  const activeGroup = BODY_GROUPS.find((g) => g.label === group) || null;
+  const q = query.trim().toLowerCase();
+  const results = (activeGroup || q)
+    ? EXERCISE_LIBRARY.filter((e) => {
+        if (activeGroup) {
+          if (sub ? e.category !== sub : !activeGroup.cats.includes(e.category)) return false;
+        }
+        return !q || e.name.toLowerCase().includes(q);
+      }).slice(0, 80)
     : [];
+
+  const chip = (active) => ({
+    background: active ? T.rust : T.iron3, color: active ? T.chalk : T.chalkDim,
+    border: `1px solid ${active ? T.rust : T.line}`, borderRadius: 999, padding: "5px 11px",
+    fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+  });
 
   return (
     <div style={{ background: T.iron, border: `1px solid ${T.line}`, borderRadius: 10, padding: 12, marginTop: 4 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: query ? 10 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Search size={15} color={T.chalkDim} style={{ flexShrink: 0 }} />
         <input
           autoFocus
@@ -70,33 +114,69 @@ function ExercisePicker({ onAdd, onClose }) {
         </button>
       </div>
 
-      {query.trim() && results.length === 0 && (
-        <div style={{ fontSize: 12.5, color: T.chalkDim, padding: "8px 2px" }}>No exercises match "{query}". Try a different term.</div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: activeGroup && activeGroup.cats.length > 1 ? 4 : 8 }}>
+        <button onClick={() => { setGroup(null); setSub(null); }} style={chip(!group)}>All</button>
+        {BODY_GROUPS.map((g) => (
+          <button key={g.label} onClick={() => { setGroup(g.label); setSub(null); }} style={chip(group === g.label)}>
+            {g.label}
+          </button>
+        ))}
+      </div>
+      {activeGroup && activeGroup.cats.length > 1 && (
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 8 }}>
+          <button onClick={() => setSub(null)} style={{ ...chip(!sub), padding: "3px 10px", fontSize: 11.5 }}>All {activeGroup.label}</button>
+          {activeGroup.cats.map((c) => (
+            <button key={c} onClick={() => setSub(c)} style={{ ...chip(sub === c), padding: "3px 10px", fontSize: 11.5 }}>{c}</button>
+          ))}
+        </div>
+      )}
+
+      {!activeGroup && !q && (
+        <div style={{ fontSize: 12, color: T.chalkDim, padding: "2px 2px 4px" }}>
+          Pick a body part above, or search by name.
+        </div>
+      )}
+
+      {(activeGroup || q) && results.length === 0 && (
+        <div style={{ fontSize: 12.5, color: T.chalkDim, padding: "8px 2px" }}>No exercises match. Try a different term or body part.</div>
       )}
 
       {results.length > 0 && (
-        <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
           {results.map((ex) => (
-            <button
-              key={ex.name}
-              onClick={() => onAdd(ex.name)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 8, padding: "9px 10px",
-                cursor: "pointer", textAlign: "left", width: "100%",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 13, color: T.chalk }}>{ex.name}</div>
-                <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 1 }}>{ex.category}</div>
+            <div key={ex.name}>
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: T.iron3, border: `1px solid ${T.line}`, borderRadius: 8, padding: "9px 10px",
+                }}
+              >
+                <button
+                  onClick={() => onAdd(ex.name)}
+                  style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+                >
+                  <div style={{ fontSize: 13, color: T.chalk }}>{ex.name}</div>
+                  <div style={{ fontSize: 10.5, color: T.chalkDim, marginTop: 1 }}>{ex.category}</div>
+                </button>
+                <button
+                  onClick={() => setTipFor(tipFor === ex.name ? null : ex.name)}
+                  title="How to do this exercise"
+                  style={{ background: "none", border: "none", cursor: "pointer", color: tipFor === ex.name ? T.brass : T.chalkDim, display: "flex", flexShrink: 0, padding: 2 }}
+                >
+                  <Info size={16} />
+                </button>
+                <button
+                  onClick={() => onAdd(ex.name)}
+                  style={{
+                    width: 24, height: 24, borderRadius: "50%", background: T.rust, flexShrink: 0, border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >
+                  <Plus size={14} color={T.chalk} />
+                </button>
               </div>
-              <div style={{
-                width: 24, height: 24, borderRadius: "50%", background: T.rust, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Plus size={14} color={T.chalk} />
-              </div>
-            </button>
+              {tipFor === ex.name && <TipBox name={ex.name} />}
+            </div>
           ))}
         </div>
       )}
@@ -386,6 +466,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
   const [days, setDays] = useState(() => ensureIds(initialDays || sourceProgram.days));
   const [addFlow, setAddFlow] = useState(null); // { dayId, stage: 'picking'|'prompt', supersetId, lastExerciseId }
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
+  const [tipFor, setTipFor] = useState(null); // exercise id whose how-to is open
   const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
   const updateExercise = (dayId, exId, field, value) => {
@@ -478,6 +559,13 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
             style={{ ...INPUT, flex: 1, padding: "10px 12px", fontSize: 13.5 }}
           />
           <button
+            onClick={() => setTipFor(tipFor === ex.id ? null : ex.id)}
+            title="How to do this exercise"
+            style={{ background: "none", border: "none", color: tipFor === ex.id ? T.brass : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+          >
+            <Info size={16} />
+          </button>
+          <button
             onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
             title="Replace this exercise"
             style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
@@ -485,6 +573,7 @@ function Customizer({ sourceProgram, initialDays, focusDayId, onCancel, onSave }
             <Repeat size={16} />
           </button>
         </div>
+        {tipFor === ex.id && <TipBox name={ex.name} />}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
@@ -639,6 +728,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
   );
   const [addFlow, setAddFlow] = useState(null); // { dayId, stage: 'picking'|'prompt', supersetId, lastExerciseId }
   const [swapFor, setSwapFor] = useState(null); // { dayId, exId } — which exercise is being replaced
+  const [tipFor, setTipFor] = useState(null); // exercise id whose how-to is open
   const [showAllDays, setShowAllDays] = useState(!focusDayId);
 
   const addDay = () => {
@@ -731,6 +821,13 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
             {ex.name}
           </div>
           <button
+            onClick={() => setTipFor(tipFor === ex.id ? null : ex.id)}
+            title="How to do this exercise"
+            style={{ background: "none", border: "none", color: tipFor === ex.id ? T.brass : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
+          >
+            <Info size={16} />
+          </button>
+          <button
             onClick={() => setSwapFor(isSwapping ? null : { dayId: day.id, exId: ex.id })}
             title="Replace this exercise"
             style={{ background: "none", border: "none", color: isSwapping ? T.rust : T.chalkDim, cursor: "pointer", flexShrink: 0 }}
@@ -738,6 +835,7 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
             <Repeat size={16} />
           </button>
         </div>
+        {tipFor === ex.id && <TipBox name={ex.name} />}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             <button onClick={() => changeSets(day.id, ex.id, -1)} style={{ ...ROUND_BTN, width: 28, height: 28 }}>
@@ -1455,6 +1553,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
   );
   const [noteOpenFor, setNoteOpenFor] = useState(null);
   const [swapExerciseFor, setSwapExerciseFor] = useState(null); // exercise index being swapped mid-workout
+  const [tipOpenFor, setTipOpenFor] = useState(null); // exercise index whose how-to is open
   const warmup = useMemo(() => generateWarmup(day.exercises, day.name), [day]);
   const [warmupOpen, setWarmupOpen] = useState(true);
   const [warmupDone, setWarmupDone] = useState(() => new Set());
@@ -1882,6 +1981,13 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
               <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: 16, color: T.chalk }}>{ex.name}</span>
                 <button
+                  onClick={() => setTipOpenFor(tipOpenFor === exIdx ? null : exIdx)}
+                  title="How to do this exercise"
+                  style={{ background: "none", border: "none", cursor: "pointer", color: tipOpenFor === exIdx ? T.brass : T.chalkDim, display: "flex", alignItems: "center", flexShrink: 0 }}
+                >
+                  <Info size={14} />
+                </button>
+                <button
                   onClick={() => setSwapExerciseFor(isSwappingEx ? null : exIdx)}
                   title="Swap this exercise"
                   style={{ background: "none", border: "none", cursor: "pointer", color: isSwappingEx ? T.rust : T.chalkDim, display: "flex", alignItems: "center", flexShrink: 0 }}
@@ -1903,6 +2009,7 @@ function WorkoutLogger({ day, dayIndex, userId, initialDraft, workouts, deloadAc
                 <div style={{ fontSize: 12, color: T.chalkDim, fontFamily: "'JetBrains Mono', monospace" }}>{ex.target}</div>
               </div>
             </div>
+            {tipOpenFor === exIdx && <TipBox name={ex.name} />}
             {isSwappingEx && (
               <ExercisePicker
                 onAdd={(newName) => swapExercise(exIdx, newName)}
