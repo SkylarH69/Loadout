@@ -16,11 +16,11 @@ export const CAT_COLOR = {
   Strength: T.rust,
   Hypertrophy: T.moss,
   Powerbuilding: T.brass,
-  Bodybuilding: "#B9764F",
-  Running: "#5B8A9A",
-  Hybrid: "#C97C3D",
-  "Combat Sports": "#8B3A3A",
-  "Glute Focus": "#B5788C",
+  Bodybuilding: "#8F5636",
+  Running: "#3E6B7A",
+  Hybrid: "#A85F1F",
+  "Combat Sports": "#7A2E2E",
+  "Glute Focus": "#9A5370",
 };
 
 /* ---------------------------------------------------------------------- */
