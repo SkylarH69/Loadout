@@ -9,6 +9,7 @@ import {
 import { supabase } from "./supabaseClient.js";
 import { T, CAT_COLOR, PROGRAMS, EXERCISE_LIBRARY, generateWarmup, defaultWeeklySchedule } from "./programs.js";
 import { getExerciseTip } from "./exerciseTips.js";
+import { buildProgram, GOALS, EQUIPMENT, EXPERIENCE, EMPHASIS, LIMITS } from "./programBuilder.js";
 import { CARD, H2, P, TITLE, INPUT, BTN_PRIMARY, BTN_SECONDARY, ROUND_BTN } from "./styles.js";
 import {
   nextId, todayStr, daysAgo, formatDuration, computeStats, formatRelativeTime,
@@ -274,11 +275,36 @@ function WeekCalendar({ schedule, workouts, onToggleDay }) {
     </div>
   );
 }
-function ProgramList({ onSelect, onCreateCustom, activeProgramId, heading, sub }) {
+function ProgramList({ onSelect, onCreateCustom, onBuildForMe, activeProgramId, heading, sub }) {
   return (
     <div style={{ padding: "24px 18px 100px" }}>
       <h1 style={TITLE}>{heading || "Program Library"}</h1>
       <p style={{ ...P, marginTop: 8 }}>{sub || "Pick a tried-and-true template. You can tweak every exercise before you save it."}</p>
+
+      {onBuildForMe && (
+        <button
+          onClick={onBuildForMe}
+          style={{
+            ...CARD, textAlign: "left", cursor: "pointer", marginBottom: 12, background: T.chalk, color: T.paper,
+            boxShadow: `4px 4px 0 ${T.rust}`, display: "flex", alignItems: "center", gap: 14,
+          }}
+        >
+          <div style={{
+            width: 42, height: 42, borderRadius: 2, background: T.rust, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Sparkles size={20} color={T.paper} />
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 19, color: T.paper, textTransform: "uppercase", marginBottom: 3 }}>
+              Build Me a Program
+            </div>
+            <div style={{ fontSize: 13, color: "rgba(241,237,221,0.78)", lineHeight: 1.4 }}>
+              Answer a few questions about your goals, schedule and equipment and get a plan made for you.
+            </div>
+          </div>
+        </button>
+      )}
 
       <button
         onClick={onCreateCustom}
@@ -1044,6 +1070,134 @@ function CustomBuilder({ initialName, initialDays, focusDayId, onCancel, onSave 
 /* ---------------------------------------------------------------------- */
 /* PROGRAMS TAB (library / detail / customize / my plan)                   */
 /* ---------------------------------------------------------------------- */
+function ProgramWizard({ onCancel, onUse }) {
+  const [a, setA] = useState({
+    goal: "muscle", days: 4, equipment: "gym", experience: "beginner", emphasis: "balanced", otherDays: 0, limits: [],
+  });
+  const [seed, setSeed] = useState(1);
+  const [result, setResult] = useState(null);
+
+  const set = (k, v) => setA((prev) => ({ ...prev, [k]: v }));
+  const toggleLimit = (id) => setA((prev) => ({
+    ...prev, limits: prev.limits.includes(id) ? prev.limits.filter((x) => x !== id) : [...prev.limits, id],
+  }));
+  const generate = (nextSeed) => {
+    setSeed(nextSeed);
+    setResult(buildProgram({ ...a, seed: nextSeed }));
+  };
+
+  const label = (text) => (
+    <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: T.chalk, margin: "22px 0 8px" }}>{text}</div>
+  );
+  const optionCard = (opt, active, onClick) => (
+    <button
+      key={opt.id}
+      onClick={onClick}
+      style={{
+        textAlign: "left", cursor: "pointer", padding: "10px 12px", borderRadius: 2,
+        border: `2px solid ${active ? T.rust : T.chalk}`, background: active ? "rgba(184,67,15,0.1)" : T.iron2,
+        boxShadow: active ? `3px 3px 0 ${T.rust}` : "none",
+      }}
+    >
+      <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 17, color: T.chalk, textTransform: "uppercase" }}>{opt.label}</div>
+      {opt.sub && <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 1 }}>{opt.sub}</div>}
+    </button>
+  );
+  const chipRow = (items, isActive, onPick) => (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {items.map((it) => (
+        <ToggleBtn key={it.id} active={isActive(it.id)} onClick={() => onPick(it.id)}>{it.label}</ToggleBtn>
+      ))}
+    </div>
+  );
+
+  if (result) {
+    return (
+      <div style={{ padding: "24px 18px 110px" }}>
+        <button onClick={() => setResult(null)} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
+          <ArrowLeft size={16} /> Change answers
+        </button>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, letterSpacing: 2, color: T.moss, fontWeight: 600 }}>YOUR PLAN</div>
+        <h1 style={{ ...TITLE, marginBottom: 6 }}>{result.splitName}</h1>
+        <p style={{ ...P, marginTop: 6, marginBottom: 16 }}>{result.daysPerWeek} days a week. Review it, then edit anything you like before saving.</p>
+
+        {result.notes.map((n, i) => (
+          <div key={i} style={{ fontSize: 12.5, color: T.chalkDim, lineHeight: 1.45, marginBottom: 6, display: "flex", gap: 8 }}>
+            <span style={{ color: T.rust }}>▪</span><span>{n}</span>
+          </div>
+        ))}
+
+        <div style={{ marginTop: 16 }}>
+          {result.days.map((day) => (
+            <div key={day.name} style={{ ...CARD, marginBottom: 14 }}>
+              <div style={{ fontFamily: "'Big Shoulders Display', sans-serif", fontWeight: 800, fontSize: 20, color: T.chalk, textTransform: "uppercase", marginBottom: 10 }}>{day.name}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7, borderTop: `2px solid ${T.chalk}`, paddingTop: 10 }}>
+                {day.exercises.map((ex) => (
+                  <div key={ex.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13.5, color: T.chalk }}>
+                    <span>{ex.name}</span>
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, whiteSpace: "nowrap" }}>{ex.sets}×{ex.reps}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={() => onUse(result)} style={BTN_PRIMARY}>
+          <Check size={18} style={{ marginRight: 6 }} /> Edit & save this plan
+        </button>
+        <button onClick={() => generate(seed + 1)} style={{ ...BTN_SECONDARY, marginTop: 10 }}>
+          <Repeat size={15} style={{ marginRight: 8 }} /> Try a different version
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "24px 18px 110px" }}>
+      <button onClick={onCancel} style={{ background: "none", border: "none", color: T.chalkDim, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, marginBottom: 16, padding: 0 }}>
+        <ArrowLeft size={16} /> Cancel
+      </button>
+      <h1 style={TITLE}>Build Me a Program</h1>
+      <p style={{ ...P, marginTop: 6, marginBottom: 0 }}>A few quick questions. You can change anything about the plan afterward.</p>
+
+      {label("1 · MAIN GOAL")}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+        {GOALS.map((g) => optionCard(g, a.goal === g.id, () => set("goal", g.id)))}
+      </div>
+
+      {label("2 · LIFTING DAYS PER WEEK")}
+      {chipRow([2, 3, 4, 5, 6].map((n) => ({ id: n, label: String(n) })), (id) => a.days === id, (id) => set("days", id))}
+
+      {label("3 · OTHER TRAINING (BJJ, RUNNING, SPORT)")}
+      {chipRow([{ id: 0, label: "None" }, { id: 1, label: "1 day" }, { id: 2, label: "2 days" }, { id: 3, label: "3+ days" }], (id) => a.otherDays === id, (id) => set("otherDays", id))}
+      <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 6 }}>More outside training means less lifting volume, so you recover.</div>
+
+      {label("4 · EQUIPMENT")}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+        {EQUIPMENT.map((e) => optionCard(e, a.equipment === e.id, () => set("equipment", e.id)))}
+      </div>
+
+      {label("5 · EXPERIENCE")}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+        {EXPERIENCE.map((e) => optionCard(e, a.experience === e.id, () => set("experience", e.id)))}
+      </div>
+
+      {label("6 · EXTRA EMPHASIS")}
+      {chipRow(EMPHASIS, (id) => a.emphasis === id, (id) => set("emphasis", id))}
+
+      {label("7 · ANYTHING TO AVOID? (OPTIONAL)")}
+      {chipRow(LIMITS, (id) => a.limits.includes(id), toggleLimit)}
+      <div style={{ fontSize: 12, color: T.chalkDim, marginTop: 6, lineHeight: 1.4 }}>
+        Tapped areas get gentler exercise choices. This is general guidance, not medical advice. Check with a doctor or physical therapist about pain.
+      </div>
+
+      <button onClick={() => generate(1)} style={{ ...BTN_PRIMARY, marginTop: 26 }}>
+        Build my program
+      </button>
+    </div>
+  );
+}
 function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId, onActivityChange, autoEdit, autoEditDayId, onAutoEditHandled }) {
   const [view, setView] = useState(profile ? "mine" : "library");
   const [detailId, setDetailId] = useState(null);
@@ -1174,6 +1328,18 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
     );
   }
 
+  if (view === "wizard") {
+    return (
+      <ProgramWizard
+        onCancel={() => setView(profile ? "mine" : "library")}
+        onUse={(generated) => {
+          setBuildState({ name: generated.splitName, days: generated.days, focusDayId: undefined });
+          setView("build");
+        }}
+      />
+    );
+  }
+
   if (view === "build" && buildState) {
     return (
       <CustomBuilder
@@ -1190,6 +1356,7 @@ function ProgramsTab({ profile, onSaveProgram, onStartWorkout, myName, myUserId,
     <ProgramList
       onSelect={openDetail}
       onCreateCustom={() => beginBuild(null)}
+      onBuildForMe={() => setView("wizard")}
       activeProgramId={profile?.program?.sourceId}
       heading={profile ? "Browse Programs" : "Choose Your Program"}
       sub={profile ? "Switch templates any time — your history and PRs stay with you." : "Already have a program? Pick the closest match and customize every detail."}
@@ -1406,7 +1573,9 @@ function classifyIncrement(name) {
 
 function parseRepTarget(repsStr) {
   if (!repsStr) return null;
-  const s = repsStr.trim().toLowerCase();
+  let s = repsStr.trim().toLowerCase();
+  if (/\bmin$/.test(s)) return { type: "time" };
+  s = s.replace(/\s*\/\s*(leg|side|arm)$/, ""); // "8-10 / leg" -> "8-10" so progression hints still work
   if (s.includes("/") || s.includes("+")) return { type: "percentage" };
   if (s.includes("s")) return { type: "time" };
   if (s === "max") return { type: "amrap" };
