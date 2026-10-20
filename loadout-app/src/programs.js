@@ -603,6 +603,7 @@ export const EXERCISE_LIBRARY = [
   { name: "Back Squat", category: "Quads" },
   { name: "Front Squat", category: "Quads" },
   { name: "Goblet Squat", category: "Quads" },
+  { name: "Bodyweight Squat", category: "Quads" },
   { name: "Hack Squat", category: "Quads" },
   { name: "Leg Press", category: "Quads" },
   { name: "Bulgarian Split Squat", category: "Quads" },
