@@ -111,6 +111,7 @@ export const EXERCISE_TIPS = {
   // ---------- QUADS ----------
   "Back Squat": "Bar on your upper back, feet shoulder-width, toes slightly out. Brace your core, sit down and back until your thighs are at least parallel, then drive up through your whole foot. Use safety arms.",
   "Front Squat": "Rest the bar on your front shoulders with your elbows high. Squat down keeping your torso upright, then drive up.",
+  "Bodyweight Squat": "Stand with feet shoulder-width apart and toes slightly out. Sit your hips back and down until your thighs are about parallel, keeping your chest up and heels on the floor, then stand. Slow the lowering phase to make it harder.",
   "Goblet Squat": "Hold one dumbbell against your chest. Squat down between your knees, keeping your chest up, then stand. A great way to learn the squat.",
   "Hack Squat": "Place your feet on the platform with your back against the pad. Lower until your knees are around 90° or deeper, then press up without locking your knees.",
   "Leg Press": "Sit with your feet shoulder-width on the platform. Lower the sled until your knees are around 90°, keeping your lower back on the pad, then press up without locking out.",
